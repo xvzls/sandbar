@@ -43,23 +43,11 @@
 	"	-h					view this help text\n"
 
 static struct wl_display *display;
-static struct wl_compositor *compositor;
-static struct wl_shm *shm;
 static struct zwlr_layer_shell_v1 *layer_shell;
 static struct zriver_status_manager_v1 *river_status_manager;
-static struct zriver_control_v1 *river_control;
-static struct wl_cursor_image *cursor_image;
-static struct wl_surface *cursor_surface;
-
-static struct wl_list bar_list, seat_list;
-
-static char **tags;
-static uint32_t tags_l;
 
 static char *fontstr = "monospace:size=16";
 static struct fcft_font *font;
-
-static bool hidden, bottom, hide_vacant, no_title, no_status_commands, no_mode, no_layout, hide_normal_mode;
 
 static pixman_color_t active_fg_color = { .red = 0xeeee, .green = 0xeeee, .blue = 0xeeee, .alpha = 0xffff, };
 static pixman_color_t active_bg_color = { .red = 0x0000, .green = 0x5555, .blue = 0x7777, .alpha = 0xffff, };
@@ -70,7 +58,7 @@ static pixman_color_t urgent_bg_color = { .red = 0xeeee, .green = 0xeeee, .blue 
 static pixman_color_t title_fg_color = { .red = 0xeeee, .green = 0xeeee, .blue = 0xeeee, .alpha = 0xffff, };
 static pixman_color_t title_bg_color = { .red = 0x0000, .green = 0x5555, .blue = 0x7777, .alpha = 0xffff, };
 
-static uint32_t
+uint32_t
 draw_text(char *text,
 	  uint32_t x,
 	  uint32_t y,
@@ -341,177 +329,6 @@ draw_frame(Bar *bar)
 
 	return 0;
 }
-
-static void
-pointer_enter(void *data, struct wl_pointer *pointer,
-	      uint32_t serial, struct wl_surface *surface,
-	      wl_fixed_t surface_x, wl_fixed_t surface_y)
-{
-	Seat *seat = (Seat *)data;
-
-	seat->hovering = true;
-	
-	if (!cursor_image) {
-		struct wl_cursor_theme *cursor_theme = wl_cursor_theme_load(NULL, 24 * buffer_scale, shm);
-		cursor_image = wl_cursor_theme_get_cursor(cursor_theme, "left_ptr")->images[0];
-		cursor_surface = wl_compositor_create_surface(compositor);
-		wl_surface_set_buffer_scale(cursor_surface, buffer_scale);
-		wl_surface_attach(cursor_surface, wl_cursor_image_get_buffer(cursor_image), 0, 0);
-		wl_surface_commit(cursor_surface);
-	}
-	wl_pointer_set_cursor(pointer, serial, cursor_surface,
-			      cursor_image->hotspot_x,
-			      cursor_image->hotspot_y);
-}
-
-static void
-pointer_leave(void *data, struct wl_pointer *pointer,
-	      uint32_t serial, struct wl_surface *surface)
-{
-	Seat *seat = (Seat *)data;
-	
-	seat->hovering = false;
-}
-
-static void
-pointer_button(void *data, struct wl_pointer *pointer, uint32_t serial,
-	       uint32_t time, uint32_t button, uint32_t state)
-{
-	Seat *seat = (Seat *)data;
-
-	seat->pointer_button = state == WL_POINTER_BUTTON_STATE_PRESSED ? button : 0;
-}
-
-static void
-pointer_motion(void *data, struct wl_pointer *pointer, uint32_t time,
-	       wl_fixed_t surface_x, wl_fixed_t surface_y)
-{
-	Seat *seat = (Seat *)data;
-
-	seat->pointer_x = wl_fixed_to_int(surface_x);
-	seat->pointer_y = wl_fixed_to_int(surface_y);
-}
-
-static void
-pointer_frame(void *data, struct wl_pointer *pointer)
-{
-	Seat *seat = (Seat *)data;
-
-	if (!seat->pointer_button || !seat->bar || !seat->hovering)
-		return;
-
-	uint32_t button = seat->pointer_button;
-	seat->pointer_button = 0;
-	
-	uint32_t i = 0, x = 0;
-	do {
-		if (hide_vacant) {
-			const bool active = seat->bar->mtags & 1 << i;
-			const bool occupied = seat->bar->ctags & 1 << i;
-			const bool urgent = seat->bar->urg & 1 << i;
-			if (!active && !occupied && !urgent)
-				continue;
-		}
-		x += TEXT_WIDTH(tags[i], seat->bar->width - x, seat->bar->textpadding, false) / buffer_scale;
-	} while (seat->pointer_x >= x && ++i < tags_l);
-	if (i < tags_l) {
-		/* Clicked on tags */
-		char *cmd;
-		if (button == BTN_LEFT)
-			cmd = "set-focused-tags";
-		else if (button == BTN_MIDDLE)
-			cmd = "toggle-focused-tags";
-		else if (button == BTN_RIGHT)
-			cmd = "set-view-tags";
-		else
-			return;
-
-		zriver_control_v1_add_argument(river_control, cmd);
-		char buf[32];
-		snprintf(buf, sizeof(buf), "%d", 1 << i);
-		zriver_control_v1_add_argument(river_control, buf);
-		zriver_control_v1_run_command(river_control, seat->wl_seat);
-		return;
-	}
-	
-	Seat *it;
-	wl_list_for_each(it, &seat_list, link) {
-		x += TEXT_WIDTH(it->mode, seat->bar->width - x, seat->bar->textpadding, false) / buffer_scale;
-		if (seat->pointer_x < x) {
-			/* clicked on mode */
-			char *mode;
-			if (button == BTN_LEFT)
-				mode = "normal";
-			else if (button == BTN_RIGHT)
-				mode = "passthrough";
-			else
-				return;
-			zriver_control_v1_add_argument(river_control, "enter-mode");
-			zriver_control_v1_add_argument(river_control, mode);
-			zriver_control_v1_run_command(river_control, it->wl_seat);
-			return;
-		}
-	}
-
-	// TODO: run custom commands upon clicking layout, title, status
-	if (seat->bar->mtags & seat->bar->ctags) {
-		x += TEXT_WIDTH(seat->bar->layout, seat->bar->width - x, seat->bar->textpadding, false) / buffer_scale;
-		if (seat->pointer_x < x) {
-			/* clicked on layout */
-			return;
-		}
-	}
-	
-	if (seat->pointer_x < seat->bar->width / buffer_scale - TEXT_WIDTH(seat->bar->status, seat->bar->width - x, seat->bar->textpadding, true) / buffer_scale) {
-		/* clicked on title */
-		return;
-	}
-	
-	/* clicked on status */
-}
-
-static void
-pointer_axis(void *data, struct wl_pointer *pointer,
-	     uint32_t time, uint32_t axis, wl_fixed_t value)
-{
-}
-
-static void
-pointer_axis_discrete(void *data, struct wl_pointer *pointer,
-		      uint32_t axis, int32_t discrete)
-{
-}
-
-static void
-pointer_axis_source(void *data, struct wl_pointer *pointer,
-		    uint32_t axis_source)
-{
-}
-
-static void
-pointer_axis_stop(void *data, struct wl_pointer *pointer,
-		  uint32_t time, uint32_t axis)
-{
-}
-
-static void
-pointer_axis_value120(void *data, struct wl_pointer *pointer,
-		      uint32_t axis, int32_t discrete)
-{
-}
-
-static const struct wl_pointer_listener pointer_listener = {
-	.axis = pointer_axis,
-	.axis_discrete = pointer_axis_discrete,
-	.axis_source = pointer_axis_source,
-	.axis_stop = pointer_axis_stop,
-	.axis_value120 = pointer_axis_value120,
-	.button = pointer_button,
-	.enter = pointer_enter,
-	.frame = pointer_frame,
-	.leave = pointer_leave,
-	.motion = pointer_motion,
-};
 
 static void
 output_description(void *data, struct wl_output *wl_output,

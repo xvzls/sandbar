@@ -86,6 +86,75 @@ extern
 int parse_color(const char *str, pixman_color_t *clr);
 
 extern
+struct zriver_control_v1 *river_control;
+
+extern
+char **tags;
+
+extern
+uint32_t tags_l;
+
+extern
+bool hidden;
+
+extern
+bool bottom;
+
+extern
+bool hide_vacant;
+
+extern
+bool no_title;
+
+extern
+bool no_status_commands;
+
+extern
+bool no_mode;
+
+extern
+bool no_layout;
+
+extern
+bool hide_normal_mode;
+
+extern
+struct wl_compositor *compositor;
+
+extern
+struct wl_shm *shm;
+
+extern
+struct wl_cursor_image *cursor_image;
+
+extern
+struct wl_surface *cursor_surface;
+
+extern
+struct wl_list bar_list;
+
+extern
+struct wl_list seat_list;
+
+extern
+uint32_t draw_text(
+  char *text,
+  uint32_t x,
+  uint32_t y,
+  pixman_image_t *foreground,
+  pixman_image_t *background,
+  pixman_color_t *fg_color,
+  pixman_color_t *bg_color,
+  uint32_t max_x,
+  uint32_t buf_height,
+  uint32_t padding,
+  bool commands
+);
+
+extern
+const struct wl_pointer_listener pointer_listener;
+
+extern
 bool run_display;
 
 extern
@@ -93,22 +162,6 @@ int draw_frame(Bar *bar);
 
 extern
 int allocate_shm_file(size_t size);
-
-extern
-void layer_surface_closed(
-  void *data,
-  struct zwlr_layer_surface_v1 *surface
-);
-
-/* Layer-surface setup adapted from layer-shell example in [wlroots] */
-extern
-void layer_surface_configure(
-  void *data,
-  struct zwlr_layer_surface_v1 *surface,
-	uint32_t serial,
-	uint32_t w,
-	uint32_t h
-);
 
 extern
 const struct zwlr_layer_surface_v1_listener layer_surface_listener;
