@@ -4,10 +4,21 @@ pub const c = @cImport({
 });
 
 export
+var height: u32 = 0;
+
+export
+var textpadding: u32 = 0;
+
+export
+var vertical_padding: u32 = 1;
+
+export
+var buffer_scale: u32 = 1;
+
 fn wl_buffer_release(
     _: ?*anyopaque,
     wl_buffer: ?*c.struct_wl_buffer,
-) void {
+) callconv(.c) void {
     // Sent by the compositor when it's no longer using
     // this buffer
     c.wl_buffer_destroy(wl_buffer);
@@ -93,12 +104,52 @@ fn allocate_shm_file(size: c_long) c_int {
 export
 var run_display = false;
 
-export
+// Layer-surface setup adapted from layer-shell example
+// in [wlroots]
+fn layer_surface_configure(
+    data: ?*anyopaque,
+    surface: ?*c.struct_zwlr_layer_surface_v1,
+    serial: u32,
+    raw_w: u32,
+    raw_h: u32,
+) callconv(.c) void {
+	c.zwlr_layer_surface_v1_ack_configure(
+	    surface,
+	    serial,
+	);
+    
+	var bar: *c.Bar = @ptrCast(@alignCast(data));
+	
+	const w = raw_w * buffer_scale;
+	const h = raw_h * buffer_scale;
+    
+	if (
+	    bar.configured and
+	    w == bar.width and
+	    h == bar.height
+	) {
+		return;
+	}
+	
+	bar.width = w;
+	bar.height = h;
+	bar.stride = bar.width * 4;
+	bar.bufsize = bar.stride * bar.height;
+	bar.configured = true;
+    
+	_ = c.draw_frame(bar);
+}
+
 fn layer_surface_closed(
-    _: *anyopaque,
-    _: *c.struct_zwlr_layer_surface_v1,
-) void {
-    std.debug.print("mogos\n", .{});
+    _: ?*anyopaque,
+    _: ?*c.struct_zwlr_layer_surface_v1,
+) callconv(.c) void {
     run_display = false;
 }
+
+export
+const layer_surface_listener = c.struct_zwlr_layer_surface_v1_listener{
+    .configure = layer_surface_configure,
+    .closed = layer_surface_closed,
+};
 

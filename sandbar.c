@@ -58,7 +58,6 @@ static uint32_t tags_l;
 
 static char *fontstr = "monospace:size=16";
 static struct fcft_font *font;
-static uint32_t height, textpadding, vertical_padding = 1, buffer_scale = 1;
 
 static bool hidden, bottom, hide_vacant, no_title, no_status_commands, no_mode, no_layout, hide_normal_mode;
 
@@ -342,35 +341,6 @@ draw_frame(Bar *bar)
 
 	return 0;
 }
-
-/* Layer-surface setup adapted from layer-shell example in [wlroots] */
-void
-layer_surface_configure(void *data, struct zwlr_layer_surface_v1 *surface,
-			uint32_t serial, uint32_t w, uint32_t h)
-{
-	zwlr_layer_surface_v1_ack_configure(surface, serial);
-	
-	Bar *bar = (Bar *)data;
-	
-	w *= buffer_scale;
-	h *= buffer_scale;
-
-	if (bar->configured && w == bar->width && h == bar->height)
-		return;
-	
-	bar->width = w;
-	bar->height = h;
-	bar->stride = bar->width * 4;
-	bar->bufsize = bar->stride * bar->height;
-	bar->configured = true;
-
-	draw_frame(bar);
-}
-
-static const struct zwlr_layer_surface_v1_listener layer_surface_listener = {
-	.configure = layer_surface_configure,
-	.closed = layer_surface_closed,
-};
 
 static void
 pointer_enter(void *data, struct wl_pointer *pointer,

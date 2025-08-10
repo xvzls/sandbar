@@ -68,6 +68,18 @@ typedef struct {
 } Seat;
 
 extern
+uint32_t height;
+
+extern
+uint32_t textpadding;
+
+extern
+uint32_t vertical_padding;
+
+extern
+uint32_t buffer_scale;
+
+extern
 const struct wl_buffer_listener wl_buffer_listener;
 
 extern
@@ -97,6 +109,9 @@ void layer_surface_configure(
 	uint32_t w,
 	uint32_t h
 );
+
+extern
+const struct zwlr_layer_surface_v1_listener layer_surface_listener;
 
 extern
 int c_main(int argc, char **argv);
