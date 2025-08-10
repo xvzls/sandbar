@@ -1,30 +1,4 @@
-#define _GNU_SOURCE
-#include <ctype.h>
-#include <errno.h>
-#include <fcft/fcft.h>
-#include <fcntl.h>
-#include <linux/input-event-codes.h>
-#include <pixman.h>
-#include <signal.h>
-#include <stdbool.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/mman.h>
-#include <sys/select.h>
-#include <wayland-client.h>
-#include <wayland-cursor.h>
-#include <wayland-util.h>
-
-#ifdef __unix__
-#include <unistd.h>
-#endif
-
-#include "utf8.h"
-#include "include/xdg-shell-protocol.h"
-#include "include/wlr-layer-shell-unstable-v1-protocol.h"
-#include "include/river-status-unstable-v1-protocol.h"
-#include "include/river-control-unstable-v1-protocol.h"
+#include "include/sandbar.h"
 
 #define DIE(fmt, ...)						\
 	do {							\
@@ -68,46 +42,6 @@
 	"	-v					get version information\n" \
 	"	-h					view this help text\n"
 
-typedef struct {
-	struct wl_output *wl_output;
-	struct wl_surface *wl_surface;
-	struct zwlr_layer_surface_v1 *layer_surface;
-	struct zriver_output_status_v1 *river_output_status;
-	
-	uint32_t registry_name;
-	char *output_name;
-
-	bool configured;
-	uint32_t width, height;
-	uint32_t textpadding;
-	uint32_t stride, bufsize;
-	
-	uint32_t mtags, ctags, urg;
-	bool sel;
-	char *layout, *title, *status;
-	
-	bool hidden, bottom;
-	bool redraw;
-
-	struct wl_list link;
-} Bar;
-
-typedef struct {
-	struct wl_seat *wl_seat;
-	struct wl_pointer *wl_pointer;
-	struct zriver_seat_status_v1 *river_seat_status;
-	uint32_t registry_name;
-
-	Bar *bar;
-	bool hovering;
-	uint32_t pointer_x, pointer_y;
-	uint32_t pointer_button;
-
-	char *mode;
-	
-	struct wl_list link;
-} Seat;
-
 static struct wl_display *display;
 static struct wl_compositor *compositor;
 static struct wl_shm *shm;
@@ -136,37 +70,6 @@ static pixman_color_t urgent_fg_color = { .red = 0x2222, .green = 0x2222, .blue 
 static pixman_color_t urgent_bg_color = { .red = 0xeeee, .green = 0xeeee, .blue = 0xeeee, .alpha = 0xffff, };
 static pixman_color_t title_fg_color = { .red = 0xeeee, .green = 0xeeee, .blue = 0xeeee, .alpha = 0xffff, };
 static pixman_color_t title_bg_color = { .red = 0x0000, .green = 0x5555, .blue = 0x7777, .alpha = 0xffff, };
-
-static bool run_display;
-
-static void
-wl_buffer_release(void *data, struct wl_buffer *wl_buffer)
-{
-	/* Sent by the compositor when it's no longer using this buffer */
-	wl_buffer_destroy(wl_buffer);
-}
-
-static const struct wl_buffer_listener wl_buffer_listener = {
-	.release = wl_buffer_release,
-};
-
-/* Shared memory support function adapted from [wayland-book] */
-static int
-allocate_shm_file(size_t size)
-{
-	int fd = memfd_create("surface", MFD_CLOEXEC);
-	if (fd == -1)
-		return -1;
-	int ret;
-	do {
-		ret = ftruncate(fd, size);
-	} while (ret == -1 && errno == EINTR);
-	if (ret == -1) {
-		close(fd);
-		return -1;
-	}
-	return fd;
-}
 
 /* Color parsing logic adapted from [sway] */
 static int
@@ -347,7 +250,7 @@ draw_text(char *text,
 #define TEXT_WIDTH(text, maxwidth, padding, commands)			\
 	draw_text(text, 0, 0, NULL, NULL, NULL, NULL, maxwidth, 0, padding, commands)
 
-static int
+int
 draw_frame(Bar *bar)
 {
 	/* Allocate buffer to be attached to the surface */
@@ -470,7 +373,7 @@ draw_frame(Bar *bar)
 }
 
 /* Layer-surface setup adapted from layer-shell example in [wlroots] */
-static void
+void
 layer_surface_configure(void *data, struct zwlr_layer_surface_v1 *surface,
 			uint32_t serial, uint32_t w, uint32_t h)
 {
@@ -491,12 +394,6 @@ layer_surface_configure(void *data, struct zwlr_layer_surface_v1 *surface,
 	bar->configured = true;
 
 	draw_frame(bar);
-}
-
-static void
-layer_surface_closed(void *data, struct zwlr_layer_surface_v1 *surface)
-{
-	run_display = false;
 }
 
 static const struct zwlr_layer_surface_v1_listener layer_surface_listener = {

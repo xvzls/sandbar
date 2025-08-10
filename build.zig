@@ -227,41 +227,35 @@ pub fn build(b: *std.Build) void {
         .name = "sandbar",
         .root_module = lib_mod,
     });
-    b.installArtifact(lib);
+    lib.linkSystemLibrary("wayland-client");
+    lib.linkSystemLibrary("wayland-cursor");
+    lib.linkSystemLibrary("fcft");
+    lib.linkSystemLibrary("pixman-1");
+    lib.linkSystemLibrary("rt");
+    lib.linkLibC();
     
-    const exe = b.addExecutable(.{
-        .name = "sandbar",
-        .root_module = exe_mod,
-    });
-    exe.linkSystemLibrary("wayland-client");
-    exe.linkSystemLibrary("wayland-cursor");
-    exe.linkSystemLibrary("fcft");
-    exe.linkSystemLibrary("pixman-1");
-    exe.linkSystemLibrary("rt");
-    exe.linkLibC();
-    
-    exe.step.dependOn(
+    lib.step.dependOn(
         generate_xdg_shell_protocol.step
     );
-    exe.step.dependOn(
+    lib.step.dependOn(
         generate_wlr_layer_shell_protocol.step
     );
-    exe.step.dependOn(
+    lib.step.dependOn(
         generate_river_status_protocol.step
     );
-    exe.step.dependOn(
+    lib.step.dependOn(
         generate_river_control_protocol.step
     );
-    exe.addIncludePath(.{
+    lib.addIncludePath(.{
         .cwd_relative = "include",
     });
     const include_paths = includePaths(b);
     for (include_paths) |path| {
-        exe.addIncludePath(.{
+        lib.addIncludePath(.{
             .cwd_relative = path,
         });
     }
-    exe.addCSourceFiles(.{
+    lib.addCSourceFiles(.{
         .files = &.{
             generate_xdg_shell_protocol.source,
             generate_wlr_layer_shell_protocol.source,
@@ -269,6 +263,12 @@ pub fn build(b: *std.Build) void {
             generate_river_control_protocol.source,
             "sandbar.c",
         },
+    });
+    b.installArtifact(lib);
+    
+    const exe = b.addExecutable(.{
+        .name = "sandbar",
+        .root_module = exe_mod,
     });
     b.installArtifact(exe);
     
