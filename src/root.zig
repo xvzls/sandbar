@@ -8,8 +8,8 @@ fn wl_buffer_release(
     _: ?*anyopaque,
     wl_buffer: ?*c.struct_wl_buffer,
 ) void {
-	// Sent by the compositor when it's no longer using
-	// this buffer
+    // Sent by the compositor when it's no longer using
+    // this buffer
     c.wl_buffer_destroy(wl_buffer);
 }
 
@@ -17,6 +17,50 @@ export
 const wl_buffer_listener = c.struct_wl_buffer_listener{
     .release = wl_buffer_release,
 };
+
+export
+fn parse_color(
+    raw_string: [*c]const u8,
+    color: *c.pixman_color_t,
+) c_int {
+    const string = std.mem.trimLeft(
+        u8,
+        std.mem.span(raw_string),
+        "#",
+    );
+    
+    if (
+        (string.len != 6 and string.len != 8) or
+        c.isxdigit(string[0]) == 0 or
+        c.isxdigit(string[1]) == 0
+    ) {
+        return -1;
+    }
+    
+    var parsed =
+        std.fmt.parseInt(u32, string, 16)
+    catch
+        return -1;
+    
+    if (string.len == 8) {
+        color.alpha = @intCast((parsed & 0xff) * 0x101);
+        parsed >>= 8;
+    } else {
+        color.alpha = 0xffff;
+    }
+    
+    color.red = @intCast(
+        ((parsed >> 16) & 0xff) * 0x101
+    );
+    color.green = @intCast(
+        ((parsed >>  8) & 0xff) * 0x101
+    );
+    color.blue = @intCast(
+        ((parsed >>  0) & 0xff) * 0x101
+    );
+    
+    return 0;
+}
 
 // Shared memory support function adapted from
 // [wayland-book]

@@ -71,35 +71,6 @@ static pixman_color_t urgent_bg_color = { .red = 0xeeee, .green = 0xeeee, .blue 
 static pixman_color_t title_fg_color = { .red = 0xeeee, .green = 0xeeee, .blue = 0xeeee, .alpha = 0xffff, };
 static pixman_color_t title_bg_color = { .red = 0x0000, .green = 0x5555, .blue = 0x7777, .alpha = 0xffff, };
 
-/* Color parsing logic adapted from [sway] */
-static int
-parse_color(const char *str, pixman_color_t *clr)
-{
-	if (*str == '#')
-		str++;
-	int len = strlen(str);
-
-	// Disallows "0x" prefix that strtoul would ignore
-	if ((len != 6 && len != 8) || !isxdigit(str[0]) || !isxdigit(str[1]))
-		return -1;
-
-	char *ptr;
-	uint32_t parsed = strtoul(str, &ptr, 16);
-	if (*ptr)
-		return -1;
-
-	if (len == 8) {
-		clr->alpha = (parsed & 0xff) * 0x101;
-		parsed >>= 8;
-	} else {
-		clr->alpha = 0xffff;
-	}
-	clr->red = ((parsed >> 16) & 0xff) * 0x101;
-	clr->green = ((parsed >>  8) & 0xff) * 0x101;
-	clr->blue = ((parsed >>  0) & 0xff) * 0x101;
-	return 0;
-}
-
 static uint32_t
 draw_text(char *text,
 	  uint32_t x,

@@ -71,12 +71,14 @@ extern
 const struct wl_buffer_listener wl_buffer_listener;
 
 extern
+int parse_color(const char *str, pixman_color_t *clr);
+
+extern
 bool run_display;
 
 extern
 int draw_frame(Bar *bar);
 
-/* Shared memory support function adapted from [wayland-book] */
 extern
 int allocate_shm_file(size_t size);
 
