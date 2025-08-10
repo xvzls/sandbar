@@ -173,6 +173,259 @@ inline fn text_width(
     );
 }
 
+export
+var font: ?*c.fcft_font = null;
+
+export
+fn draw_text(
+    raw_text: [*c]const u8,
+    raw_x: u32,
+    y: u32,
+    foreground: ?*c.pixman_image_t,
+    background: ?*c.pixman_image_t,
+    fg_color: ?*c.pixman_color_t,
+    bg_color: ?*c.pixman_color_t,
+    max_x: u32,
+    buf_height: u32,
+    padding: u32,
+    commands: bool,
+) u32 {
+    var x = raw_x;
+    if (raw_text == null or max_x == 0) {
+        return x;
+    }
+    
+    const text: []const u8 = std.mem.span(raw_text);
+    if (text.len == 0) {
+        return x;
+    }
+    
+    const ix: u32 = x;
+    var nx: u32 = x + padding;
+    
+    if (nx + padding >= max_x) {
+        return x;
+    }
+    x = nx;
+    
+    const draw_fg = foreground != null and fg_color != null;
+    const draw_bg = background != null and bg_color != null;
+    
+    var fg_fill: ?*c.pixman_image_t = if (draw_fg)
+        c.pixman_image_create_solid_fill(fg_color)
+    else
+        null;
+    var cur_bg_color: c.pixman_color_t = if (draw_bg)
+        bg_color.?.*
+    else
+        std.mem.zeroes(c.pixman_color_t);
+    
+    var codepoint: u32 = 0;
+    var state: u32 = c.UTF8_ACCEPT;
+    var last_cp: u32 = 0;
+    
+    var p = raw_text;
+    while (p.* != 0) : (p += 1) {
+        // Check for inline ^ commands
+        if (
+            !no_status_commands and
+            commands and
+            state == c.UTF8_ACCEPT and
+            p.* == '^'
+        ) {
+            p += 1;
+            if (p.* != '^') {
+                // Parse color
+                var arg = c.strchr(p, '(');
+                const end = c.strchr(arg + 1, ')');
+                if (arg == null or end == null) {
+                    continue;
+                }
+                arg.* = 0;
+                end.* = 0;
+                arg += 1;
+                
+                if (c.strcmp(p, "bg") == 0) {
+                    if (draw_bg) {
+                        if (arg.* == 0) {
+                            cur_bg_color = bg_color.?.*;
+                        } else {
+                            _ = parse_color(
+                                arg,
+                                &cur_bg_color,
+                            );
+                        }
+                    }
+                } else if (c.strcmp(p, "fg") == 0) {
+                    if (draw_fg) {
+                        var color: c.pixman_color_t = undefined;
+                        var refresh = true;
+                        if (arg.* == 0) {
+                            color = fg_color.?.*;
+                        } else if (parse_color(
+                            arg,
+                            &color,
+                        ) == -1) {
+                            refresh = false;
+                        }
+                        
+                        if (refresh) {
+                            _ = c.pixman_image_unref(
+                                fg_fill
+                            );
+                            fg_fill = c.pixman_image_create_solid_fill(&color);
+                        }
+                    }
+                }
+                
+                // Restore string for later redraws
+                arg -= 1;
+                arg.* = '(';
+                end.* = ')';
+                p = end;
+                continue;
+            }
+        }
+        
+        // Returns nonzero if more bytes are needed
+        if (c.utf8decode(&state, &codepoint, p.*) != 0) {
+            continue;
+        }
+        // Turn off subpixel rendering, which
+        // complicates things when mixed with alpha
+        // channels
+        const glyph = c.fcft_rasterize_char_utf32(
+            font,
+            codepoint,
+            c.FCFT_SUBPIXEL_NONE,
+        );
+        if (glyph == null) {
+            continue;
+        }
+        // Adjust x position based on kerning with
+        // previous glyph
+        var kern: c_long = 0;
+        if (last_cp != 0) {
+            _ = c.fcft_kerning(
+                font,
+                last_cp,
+                codepoint,
+                &kern,
+                null,
+            );
+        }
+        
+        nx = @intCast(x + kern + glyph.*.advance.x);
+        if (nx + padding > max_x) {
+            break;
+        }
+        last_cp = codepoint;
+        x += @intCast(kern);
+        
+        if (draw_fg) {
+            // Detect and handle pre-rendered glyphs
+            // (e.g. emoji)
+            if (
+                c.pixman_image_get_format(glyph.*.pix) ==
+                c.PIXMAN_a8r8g8b8
+            ) {
+                // Only the alpha channel of the mask is
+                // used, so we can use fgfill here to
+                // blend prerendered glyphs with the
+                // same opacity
+                c.pixman_image_composite32(
+                    c.PIXMAN_OP_OVER,
+                    glyph.*.pix,
+                    fg_fill,
+                    foreground,
+                    0,
+                    0,
+                    0,
+                    0,
+                    @intCast(x + @as(u32, @intCast(glyph.*.x))),
+                    @intCast(y - @as(u32, @intCast(glyph.*.y))),
+                    glyph.*.width,
+                    glyph.*.height,
+                );
+            } else {
+                // Applying the foreground color here
+                // would mess up component alphas for
+                // subpixel-rendered text, so we apply
+                // it when blending.
+                c.pixman_image_composite32(
+                    c.PIXMAN_OP_OVER,
+                    fg_fill,
+                    glyph.*.pix,
+                    foreground,
+                    0,
+                    0,
+                    0,
+                    0,
+                    @intCast(x + @as(u32, @intCast(glyph.*.x))),
+                    @intCast(y - @as(u32, @intCast(glyph.*.y))),
+                    glyph.*.width,
+                    glyph.*.height,
+                );
+            }
+        }
+        
+        if (draw_bg) {
+            _ = c.pixman_image_fill_boxes(
+                c.PIXMAN_OP_OVER,
+                background,
+                &cur_bg_color,
+                1,
+                &c.pixman_box32_t{
+                    .x1 = @intCast(x),
+                    .x2 = @intCast(nx),
+                    .y1 = 0,
+                    .y2 = @intCast(buf_height),
+                },
+            );
+        }
+        
+        // Increment pen position
+        x = nx;
+    }
+    
+    if (draw_fg) {
+        _ = c.pixman_image_unref(fg_fill);
+    }
+    if (last_cp == 0) {
+        return ix;
+    }
+    nx = x + padding;
+    if (draw_bg) {
+        // Fill padding background
+        _ = c.pixman_image_fill_boxes(
+            c.PIXMAN_OP_OVER,
+            background,
+            bg_color,
+            1,
+            &c.pixman_box32_t{
+                .x1 = @intCast(ix),
+                .x2 = @intCast(ix + padding),
+                .y1 = 0,
+                .y2 = @intCast(buf_height),
+            },
+        );
+        _ = c.pixman_image_fill_boxes(
+            c.PIXMAN_OP_OVER,
+            background,
+            bg_color,
+            1,
+            &c.pixman_box32_t{
+                .x1 = @intCast(x),
+                .x2 = @intCast(nx),
+                .y1 = 0,
+                .y2 = @intCast(buf_height),
+            },
+        );
+    }
+    
+    return nx;
+}
+
 fn pointer_enter(
     data: ?*anyopaque,
     pointer: ?*c.struct_wl_pointer,
@@ -424,11 +677,11 @@ fn pointer_frame(
 
 export
 const pointer_listener = c.struct_wl_pointer_listener{
-	.button = pointer_button,
-	.enter = pointer_enter,
-	.frame = pointer_frame,
-	.leave = pointer_leave,
-	.motion = pointer_motion,
+    .button = pointer_button,
+    .enter = pointer_enter,
+    .frame = pointer_frame,
+    .leave = pointer_leave,
+    .motion = pointer_motion,
 };
 
 fn output_description(
@@ -471,21 +724,21 @@ fn output_mode(
 fn output_name(
     data: ?*anyopaque,
     _: ?*c.struct_wl_output,
-	name: [*c]const u8,
+    name: [*c]const u8,
 ) callconv(.c) void {
     var bar: *c.Bar = @alignCast(@ptrCast(data.?));
     
-	if (bar.output_name != null) {
-		c.free(bar.output_name);
-	}
+    if (bar.output_name != null) {
+        c.free(bar.output_name);
+    }
     
-	bar.output_name = c.strdup(name);
-	if (bar.output_name == null) {
-	    std.debug.print("strdup: {s}\n", .{
-	        c.strerror(std.c._errno().*),
-	    });
-	    std.process.exit(1);
-	}
+    bar.output_name = c.strdup(name);
+    if (bar.output_name == null) {
+        std.debug.print("strdup: {s}\n", .{
+            c.strerror(std.c._errno().*),
+        });
+        std.process.exit(1);
+    }
 }
 
 fn output_scale(
@@ -501,8 +754,8 @@ const output_listener = c.struct_wl_output_listener{
     .done = output_done,
     .geometry = output_geometry,
     .mode = output_mode,
-	.name = output_name,
-	.scale = output_scale,
+    .name = output_name,
+    .scale = output_scale,
 };
 
 export

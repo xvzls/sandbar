@@ -137,6 +137,9 @@ extern
 struct wl_list seat_list;
 
 extern
+struct fcft_font *font;
+
+extern
 uint32_t draw_text(
   char *text,
   uint32_t x,
