@@ -431,6 +431,80 @@ const pointer_listener = c.struct_wl_pointer_listener{
 	.motion = pointer_motion,
 };
 
+fn output_description(
+    _: ?*anyopaque,
+    _: ?*c.struct_wl_output,
+    _: [*c]const u8,
+) callconv(.c) void {
+}
+
+fn output_done(
+    _: ?*anyopaque,
+    _: ?*c.struct_wl_output,
+) callconv(.c) void {
+}
+
+fn output_geometry(
+    _: ?*anyopaque,
+    _: ?*c.struct_wl_output,
+    _: i32,
+    _: i32,
+    _: i32,
+    _: i32,
+    _: i32,
+    _: [*c]const u8,
+    _: [*c]const u8,
+    _: i32,
+) callconv(.c) void {
+}
+
+fn output_mode(
+    _: ?*anyopaque,
+    _: ?*c.struct_wl_output,
+    _: u32,
+    _: i32,
+    _: i32,
+    _: i32,
+) callconv(.c) void {
+}
+
+fn output_name(
+    data: ?*anyopaque,
+    _: ?*c.struct_wl_output,
+	name: [*c]const u8,
+) callconv(.c) void {
+    var bar: *c.Bar = @alignCast(@ptrCast(data.?));
+    
+	if (bar.output_name != null) {
+		c.free(bar.output_name);
+	}
+    
+	bar.output_name = c.strdup(name);
+	if (bar.output_name == null) {
+	    std.debug.print("strdup: {s}\n", .{
+	        c.strerror(std.c._errno().*),
+	    });
+	    std.process.exit(1);
+	}
+}
+
+fn output_scale(
+    _: ?*anyopaque,
+    _: ?*c.struct_wl_output,
+    _: i32,
+) callconv(.c) void {
+}
+
+export
+const output_listener = c.struct_wl_output_listener{
+    .description = output_description,
+    .done = output_done,
+    .geometry = output_geometry,
+    .mode = output_mode,
+	.name = output_name,
+	.scale = output_scale,
+};
+
 export
 var run_display = false;
 

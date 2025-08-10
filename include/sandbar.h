@@ -155,6 +155,9 @@ extern
 const struct wl_pointer_listener pointer_listener;
 
 extern
+const struct wl_output_listener output_listener;
+
+extern
 bool run_display;
 
 extern

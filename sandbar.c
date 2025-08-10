@@ -331,59 +331,6 @@ draw_frame(Bar *bar)
 }
 
 static void
-output_description(void *data, struct wl_output *wl_output,
-	const char *description)
-{
-}
-
-static void
-output_done(void *data, struct wl_output *wl_output)
-{
-}
-
-static void
-output_geometry(void *data, struct wl_output *wl_output,
-	int32_t x, int32_t y, int32_t physical_width, int32_t physical_height,
-	int32_t subpixel, const char *make, const char *model,
-	int32_t transform)
-{
-}
-
-static void
-output_mode(void *data, struct wl_output *wl_output,
-	uint32_t flags, int32_t width, int32_t height,
-	int32_t refresh)
-{
-}
-
-static void
-output_name(void *data, struct wl_output *wl_output,
-	const char *name)
-{
-	Bar *bar = (Bar *)data;
-
-	if (bar->output_name)
-		free(bar->output_name);
-	if (!(bar->output_name = strdup(name)))
-		EDIE("strdup");
-}
-
-static void
-output_scale(void *data, struct wl_output *wl_output,
-	int32_t factor)
-{
-}
-
-static const struct wl_output_listener output_listener = {
-	.description = output_description,
-	.done = output_done,
-	.geometry = output_geometry,
-	.mode = output_mode,
-	.name = output_name,
-	.scale = output_scale,
-};
-
-static void
 seat_capabilities(void *data, struct wl_seat *wl_seat,
 		  uint32_t capabilities)
 {
