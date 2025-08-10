@@ -15,8 +15,8 @@
         # packages.default = pkgs.callPackage ./package.nix {};
         devShells.default = pkgs.mkShell {
           buildInputs = [
-            # pkgs.zig
-            # pkgs.zls
+            pkgs.zig
+            pkgs.zls
             pkgs.pkg-config
             
             pkgs.wayland-scanner

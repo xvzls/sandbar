@@ -1,0 +1,15 @@
+.{
+    .name = .sandbar,
+    .version = "0.0.0",
+    .fingerprint = 0x98bc35f7b9948f39,
+    
+    .minimum_zig_version = "0.14.1",
+    
+    .dependencies = .{
+    },
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+    },
+}

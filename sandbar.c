@@ -4,7 +4,7 @@
 #include <fcft/fcft.h>
 #include <fcntl.h>
 #include <linux/input-event-codes.h>
-#include <pixman-1/pixman.h>
+#include <pixman.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -21,10 +21,10 @@
 #endif
 
 #include "utf8.h"
-#include "xdg-shell-protocol.h"
-#include "wlr-layer-shell-unstable-v1-protocol.h"
-#include "river-status-unstable-v1-protocol.h"
-#include "river-control-unstable-v1-protocol.h"
+#include "include/xdg-shell-protocol.h"
+#include "include/wlr-layer-shell-unstable-v1-protocol.h"
+#include "include/river-status-unstable-v1-protocol.h"
+#include "include/river-control-unstable-v1-protocol.h"
 
 #define DIE(fmt, ...)						\
 	do {							\
@@ -1237,7 +1237,7 @@ sig_handler(int sig)
 }
 
 int
-main(int argc, char **argv)
+c_main(int argc, char **argv)
 {
 	Bar *bar, *bar2;
 	Seat *seat, *seat2;
