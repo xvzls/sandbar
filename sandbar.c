@@ -183,32 +183,6 @@ draw_frame(Bar *bar)
 }
 
 static void
-seat_capabilities(void *data, struct wl_seat *wl_seat,
-		  uint32_t capabilities)
-{
-	Seat *seat = (Seat *)data;
-	
-	const uint32_t has_pointer = capabilities & WL_SEAT_CAPABILITY_POINTER;
-	if (has_pointer && !seat->wl_pointer) {
-		seat->wl_pointer = wl_seat_get_pointer(seat->wl_seat);
-		wl_pointer_add_listener(seat->wl_pointer, &pointer_listener, seat);
-	} else if (!has_pointer && seat->wl_pointer) {
-		wl_pointer_destroy(seat->wl_pointer);
-		seat->wl_pointer = NULL;
-	}
-}
-
-static void
-seat_name(void *data, struct wl_seat *wl_seat, const char *name)
-{
-}
-
-static const struct wl_seat_listener seat_listener = {
-	.capabilities = seat_capabilities,
-	.name = seat_name,
-};
-
-static void
 river_output_status_focused_tags(void *data, struct zriver_output_status_v1 *output_status,
 				 uint32_t tags)
 {

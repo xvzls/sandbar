@@ -810,3 +810,43 @@ const layer_surface_listener = c.struct_zwlr_layer_surface_v1_listener{
     .closed = layer_surface_closed,
 };
 
+
+fn seat_capabilities(
+    data: ?*anyopaque,
+    _: ?*c.struct_wl_seat,
+	capabilities: u32,
+) callconv(.c) void {
+    var seat: *c.Seat = @ptrCast(@alignCast(data.?));
+	
+	const has_pointer = (capabilities & c.WL_SEAT_CAPABILITY_POINTER) != 0;
+	if (has_pointer and seat.wl_pointer == null) {
+		seat.wl_pointer = c.wl_seat_get_pointer(
+		    seat.wl_seat,
+		);
+		_ = c.wl_pointer_add_listener(
+		    seat.wl_pointer,
+		    &pointer_listener,
+		    seat,
+		);
+	} else if (
+	    !has_pointer and
+	    seat.wl_pointer != null
+	) {
+		c.wl_pointer_destroy(seat.wl_pointer);
+		seat.wl_pointer = null;
+	}
+}
+
+fn seat_name(
+    _: ?*anyopaque,
+    _: ?*c.struct_wl_seat,
+    _: [*c]const u8,
+) callconv(.c) void {
+}
+
+export
+const seat_listener = c.struct_wl_seat_listener{
+    .capabilities = seat_capabilities,
+    .name = seat_name,
+};
+

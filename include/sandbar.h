@@ -173,5 +173,8 @@ extern
 const struct zwlr_layer_surface_v1_listener layer_surface_listener;
 
 extern
+const struct wl_seat_listener seat_listener;
+
+extern
 int c_main(int argc, char **argv);
 
