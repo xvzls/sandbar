@@ -1240,3 +1240,90 @@ const seat_listener = c.struct_wl_seat_listener{
     .name = seat_name,
 };
 
+fn river_output_status_focused_tags(
+    data: ?*anyopaque,
+    _: ?*c.struct_zriver_output_status_v1,
+    n_tags: u32,
+) callconv(.c) void {
+    var bar: *c.Bar = @ptrCast(@alignCast(data.?));
+    
+    bar.mtags = n_tags;
+    bar.redraw = true;
+}
+
+fn river_output_status_urgent_tags(
+    data: ?*anyopaque,
+    _: ?*c.struct_zriver_output_status_v1,
+    n_tags: u32,
+) callconv(.c) void {
+    var bar: *c.Bar = @ptrCast(@alignCast(data.?));
+    
+    bar.urg = n_tags;
+    bar.redraw = true;
+}
+
+fn river_output_status_view_tags(
+    data: ?*anyopaque,
+    _: ?*c.struct_zriver_output_status_v1,
+    wl_array: ?*c.struct_wl_array,
+) callconv(.c) void {
+    var bar: *c.Bar = @ptrCast(@alignCast(data.?));
+    
+    bar.ctags = 0;
+    
+    var items: []u32 = undefined;
+    items.ptr = @ptrCast(@alignCast(
+        wl_array.?.data.?
+    ));
+    items.len = wl_array.?.size / @sizeOf(u32);
+    
+    for (items) |item| {
+        bar.ctags |= item;
+    }
+    bar.redraw = true;
+}
+
+fn river_output_status_layout_name(
+    data: ?*anyopaque,
+    _: ?*c.struct_zriver_output_status_v1,
+    name: [*c]const u8,
+) callconv(.c) void {
+    var bar: *c.Bar = @ptrCast(@alignCast(data.?));
+    
+    if (bar.layout != null) {
+        c.free(bar.layout);
+    }
+    
+    bar.layout = c.strdup(name);
+    if (bar.layout == null) {
+        std.debug.print("strdup: {s}\n", .{
+            c.strerror(std.c._errno().*),
+        });
+        std.process.exit(1);
+    }
+    
+    bar.redraw = true;
+}
+
+fn river_output_status_layout_name_clear(
+    data: ?*anyopaque,
+    _: ?*c.struct_zriver_output_status_v1,
+) callconv(.c) void {
+    var bar: *c.Bar = @ptrCast(@alignCast(data.?));
+    
+    if (bar.layout != null) {
+        c.free(bar.layout);
+        bar.layout = null;
+    }
+}
+
+export
+const river_output_status_listener = c.struct_zriver_output_status_v1_listener{
+    .focused_tags = river_output_status_focused_tags,
+    .urgent_tags = river_output_status_urgent_tags,
+    .view_tags = river_output_status_view_tags,
+    .layout_name = river_output_status_layout_name,
+    .layout_name_clear = river_output_status_layout_name_clear,
+};
+
+
