@@ -3,6 +3,72 @@ pub const c = @cImport({
     @cInclude("sandbar.h");
 });
 
+
+export
+var active_fg_color = c.pixman_color_t{
+    .red = 0xeeee,
+    .green = 0xeeee,
+    .blue = 0xeeee,
+    .alpha = 0xffff,
+};
+
+export
+var active_bg_color = c.pixman_color_t{
+    .red = 0x0000,
+    .green = 0x5555,
+    .blue = 0x7777,
+    .alpha = 0xffff,
+};
+
+export
+var inactive_fg_color = c.pixman_color_t{
+    .red = 0xbbbb,
+    .green = 0xbbbb,
+    .blue = 0xbbbb,
+    .alpha = 0xffff,
+};
+
+export
+var inactive_bg_color = c.pixman_color_t{
+    .red = 0x2222,
+    .green = 0x2222,
+    .blue = 0x2222,
+    .alpha = 0xffff,
+};
+
+export
+var urgent_fg_color = c.pixman_color_t{
+    .red = 0x2222,
+    .green = 0x2222,
+    .blue = 0x2222,
+    .alpha = 0xffff,
+};
+
+export
+var urgent_bg_color = c.pixman_color_t{
+    .red = 0xeeee,
+    .green = 0xeeee,
+    .blue = 0xeeee,
+    .alpha = 0xffff,
+};
+
+export
+var title_fg_color = c.pixman_color_t{
+    .red = 0xeeee,
+    .green = 0xeeee,
+    .blue = 0xeeee,
+    .alpha = 0xffff,
+};
+
+export
+var title_bg_color = c.pixman_color_t{
+    .red = 0x0000,
+    .green = 0x5555,
+    .blue = 0x7777,
+    .alpha = 0xffff,
+};
+
+
 export
 var height: u32 = 0;
 
@@ -14,6 +80,330 @@ var vertical_padding: u32 = 1;
 
 export
 var buffer_scale: u32 = 1;
+
+export
+fn draw_frame(
+    bar: *c.Bar,
+) c_int {
+    // Allocate buffer to be attached to the surface
+    const fd = c.allocate_shm_file(bar.bufsize);
+    if (fd == -1) {
+        return -1;
+    }
+    
+    const raw_data = c.mmap(
+        null,
+        bar.bufsize,
+        c.PROT_READ | c.PROT_WRITE,
+        c.MAP_SHARED,
+        fd,
+        0,
+    );
+    if (raw_data == c.MAP_FAILED) {
+        _ = c.close(fd);
+        return -1;
+    }
+    const data: [*c]u32 = @ptrCast(@alignCast(
+        raw_data
+    ));
+    
+    const pool = c.wl_shm_create_pool(
+        shm,
+        fd,
+        @intCast(bar.bufsize),
+    );
+    const buffer = c.wl_shm_pool_create_buffer(
+        pool,
+        0,
+        @intCast(bar.width),
+        @intCast(bar.height),
+        @intCast(bar.stride),
+        c.WL_SHM_FORMAT_ARGB8888,
+    );
+    _ = c.wl_buffer_add_listener(
+        buffer,
+        &wl_buffer_listener,
+        null,
+    );
+    c.wl_shm_pool_destroy(pool);
+    _ = c.close(fd);
+    
+    // Pixman image corresponding to main buffer
+    const final = c.pixman_image_create_bits(
+        c.PIXMAN_a8r8g8b8,
+        @intCast(bar.width),
+        @intCast(bar.height),
+        data,
+        @intCast(bar.width * 4),
+    );
+    
+    // Text background and foreground layers
+    const foreground = c.pixman_image_create_bits(
+        c.PIXMAN_a8r8g8b8,
+        @intCast(bar.width),
+        @intCast(bar.height),
+        null,
+        @intCast(bar.width * 4),
+    );
+    const background = c.pixman_image_create_bits(
+        c.PIXMAN_a8r8g8b8,
+        @intCast(bar.width),
+        @intCast(bar.height),
+        null,
+        @intCast(bar.width * 4),
+    );
+    
+    // Draw on images
+    var x: u32 = 0;
+    const y: u32 = (
+        bar.height +
+        @as(u32, @intCast(font.?.ascent)) -
+        @as(u32, @intCast(font.?.descent))
+    ) / 2;
+    const boxs: u32 = @intCast(
+        @divFloor(font.?.height, 9)
+    );
+    const boxw: u32 = @intCast(
+        @divFloor(font.?.height, 6) + 2
+    );
+    
+    for (0 .. tags_l) |i| {
+        const one: u32 = 1;
+        const ii: u5 = @intCast(i);
+        
+        const active = (bar.mtags & one << ii) != 0;
+        const occupied = (bar.ctags & one << ii) != 0;
+        const urgent = (bar.urg & one << ii) != 0;
+        
+        if (
+            hide_vacant and
+            !active and
+            !occupied and
+            !urgent
+        ) {
+            continue;
+        }
+        
+        const fg_color = if (urgent)
+            &urgent_fg_color
+        else if (active)
+            &active_fg_color
+        else
+            &inactive_fg_color;
+        const bg_color = if (urgent)
+            &urgent_bg_color
+        else if (active)
+            &active_bg_color
+        else
+            &inactive_bg_color;
+        
+        if (!hide_vacant and occupied) {
+            _ = c.pixman_image_fill_boxes(
+                c.PIXMAN_OP_SRC,
+                foreground,
+                fg_color,
+                1,
+                &c.pixman_box32_t{
+                    .x1 = @intCast(x + boxs),
+                    .x2 = @intCast(x + boxs + boxw),
+                    .y1 = @intCast(boxs),
+                    .y2 = @intCast(boxs + boxw),
+                },
+            );
+            
+            if ((!bar.sel or !active) and boxw >= 3) {
+                // Make box hollow
+                _ = c.pixman_image_fill_boxes(
+                    c.PIXMAN_OP_SRC,
+                    foreground,
+                    &std.mem.zeroes(c.pixman_color_t),
+                    1,
+                    &c.pixman_box32_t{
+                        .x1 = @intCast(x + boxs + 1),
+                        .x2 = @intCast(x + boxs + boxw - 1),
+                        .y1 = @intCast(boxs + 1),
+                        .y2 = @intCast(boxs + boxw - 1),
+                    },
+                );
+            }
+        }
+        
+        x = c.draw_text(
+            tags[i],
+            x,
+            y,
+            foreground,
+            background,
+            fg_color,
+            bg_color,
+            bar.width,
+            bar.height,
+            bar.textpadding,
+            false,
+        );
+    }
+    
+    if (!no_mode) {
+        var pos: ?*c.wl_list = seat_list.next;
+        
+        while (pos != &seat_list) : (pos = pos.?.next) {
+            const seat: *c.Seat = @fieldParentPtr(
+                "link",
+                pos.?,
+            );
+            
+            if ((
+                hide_normal_mode and
+                (
+                    seat.mode != null and
+                    c.strcmp(seat.mode, "normal") != 0
+                )
+            ) or !hide_normal_mode) {
+                x = c.draw_text(
+                    seat.mode,
+                    x,
+                    y,
+                    foreground,
+                    background,
+                    &inactive_fg_color,
+                    &inactive_bg_color,
+                    bar.width,
+                    bar.height,
+                    bar.textpadding,
+                    false,
+                );
+            }
+        }
+    }
+    
+    if (!no_layout) {
+        if ((bar.mtags & bar.ctags) != 0) {
+            x = c.draw_text(
+                bar.layout,
+                x,
+                y,
+                foreground,
+                background,
+                &inactive_fg_color,
+                &inactive_bg_color,
+                bar.width,
+                bar.height,
+                bar.textpadding,
+                false,
+            );
+        }
+    }
+    
+    const status_width = text_width(
+        bar.status,
+        bar.width - x,
+        bar.textpadding,
+        true,
+    );
+    _ = draw_text(
+        bar.status,
+        bar.width - status_width,
+        y,
+        foreground,
+        background,
+        &inactive_fg_color,
+        &inactive_bg_color,
+        bar.width,
+        bar.height,
+        bar.textpadding,
+        true,
+    );
+    
+    if (!no_title) {
+        x = draw_text(
+            bar.title,
+            x,
+            y,
+            foreground,
+            background,
+            if (bar.sel)
+                &title_fg_color
+            else
+                &inactive_fg_color,
+            if (bar.sel)
+                &title_bg_color
+            else
+                &inactive_bg_color,
+            bar.width - status_width,
+            bar.height,
+            bar.textpadding,
+            false,
+        );
+    }
+    
+    _ = c.pixman_image_fill_boxes(
+        c.PIXMAN_OP_SRC,
+        background,
+        if (bar.sel)
+            &title_bg_color
+        else
+            &title_bg_color,
+        1,
+        &c.pixman_box32_t{
+            .x1 = @intCast(x),
+            .x2 = @intCast(bar.width - status_width),
+            .y1 = 0,
+            .y2 = @intCast(bar.height),
+        },
+    );
+    
+    // Draw background and foreground on bar
+    c.pixman_image_composite32(
+        c.PIXMAN_OP_OVER,
+        background,
+        null,
+        final,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        @intCast(bar.width),
+        @intCast(bar.height),
+    );
+    _ = c.pixman_image_composite32(
+        c.PIXMAN_OP_OVER,
+        foreground,
+        null,
+        final,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        @intCast(bar.width),
+        @intCast(bar.height),
+    );
+    
+    _ = c.pixman_image_unref(foreground);
+    _ = c.pixman_image_unref(background);
+    _ = c.pixman_image_unref(final);
+    
+    _ = c.munmap(data, bar.bufsize);
+    
+    c.wl_surface_set_buffer_scale(
+        bar.wl_surface,
+        @intCast(buffer_scale),
+    );
+    c.wl_surface_attach(bar.wl_surface, buffer, 0, 0);
+    c.wl_surface_damage_buffer(
+        bar.wl_surface,
+        0,
+        0,
+        @intCast(bar.width),
+        @intCast(bar.height),
+    );
+    c.wl_surface_commit(bar.wl_surface);
+    
+    return 0;
+}
 
 fn wl_buffer_release(
     _: ?*anyopaque,
@@ -814,27 +1204,27 @@ const layer_surface_listener = c.struct_zwlr_layer_surface_v1_listener{
 fn seat_capabilities(
     data: ?*anyopaque,
     _: ?*c.struct_wl_seat,
-	capabilities: u32,
+    capabilities: u32,
 ) callconv(.c) void {
     var seat: *c.Seat = @ptrCast(@alignCast(data.?));
-	
-	const has_pointer = (capabilities & c.WL_SEAT_CAPABILITY_POINTER) != 0;
-	if (has_pointer and seat.wl_pointer == null) {
-		seat.wl_pointer = c.wl_seat_get_pointer(
-		    seat.wl_seat,
-		);
-		_ = c.wl_pointer_add_listener(
-		    seat.wl_pointer,
-		    &pointer_listener,
-		    seat,
-		);
-	} else if (
-	    !has_pointer and
-	    seat.wl_pointer != null
-	) {
-		c.wl_pointer_destroy(seat.wl_pointer);
-		seat.wl_pointer = null;
-	}
+    
+    const has_pointer = (capabilities & c.WL_SEAT_CAPABILITY_POINTER) != 0;
+    if (has_pointer and seat.wl_pointer == null) {
+        seat.wl_pointer = c.wl_seat_get_pointer(
+            seat.wl_seat,
+        );
+        _ = c.wl_pointer_add_listener(
+            seat.wl_pointer,
+            &pointer_listener,
+            seat,
+        );
+    } else if (
+        !has_pointer and
+        seat.wl_pointer != null
+    ) {
+        c.wl_pointer_destroy(seat.wl_pointer);
+        seat.wl_pointer = null;
+    }
 }
 
 fn seat_name(

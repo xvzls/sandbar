@@ -67,6 +67,33 @@ typedef struct {
 	struct wl_list link;
 } Seat;
 
+
+extern
+const pixman_color_t active_fg_color;
+
+extern
+const pixman_color_t active_bg_color;
+
+extern
+const pixman_color_t inactive_fg_color;
+
+extern
+const pixman_color_t inactive_bg_color;
+
+extern
+const pixman_color_t urgent_fg_color;
+
+extern
+const pixman_color_t urgent_bg_color;
+
+extern
+const pixman_color_t title_fg_color;
+
+extern
+const pixman_color_t title_bg_color;
+
+
+
 extern
 uint32_t height;
 
