@@ -10,7 +10,7 @@ fn focused_output(
     _: ?*c.struct_zriver_seat_status_v1,
     wl_output: ?*c.struct_wl_output,
 ) callconv(.c) void {
-    var seat: *c.Seat = @ptrCast(@alignCast(data.?));
+    const seat: *c.Seat = @ptrCast(@alignCast(data.?));
     
     var bars = wl.List(c.Bar)
         .from(&lib.bar_list)
@@ -33,7 +33,7 @@ fn unfocused_output(
     _: ?*c.struct_zriver_seat_status_v1,
     _: ?*c.struct_wl_output,
 ) callconv(.c) void {
-    var seat: *c.Seat = @ptrCast(@alignCast(data.?));
+    const seat: *c.Seat = @ptrCast(@alignCast(data.?));
     const bar: *c.Bar = seat.bar orelse return;
     
     bar.sel = false;
@@ -51,22 +51,20 @@ fn focused_view(
     }
     
     const seat: *c.Seat = @ptrCast(@alignCast(data.?));
-    if (seat.bar == null) {
-        return;
+    const bar: *c.Bar = seat.bar orelse return;
+    
+    if (bar.title) |ptr| {
+        c.free(ptr);
     }
     
-    if (seat.bar.*.title != null) {
-        c.free(seat.bar.*.title);
-    }
+    bar.title = std.heap.c_allocator.dupeZ(
+        u8,
+        std.mem.span(title)
+    ) catch |err| {
+        @panic(@errorName(err));
+    };
     
-    seat.bar.*.title = c.strdup(title);
-    if (seat.bar.*.title == null) {
-        std.debug.print("strdup: {s}\n", .{
-            c.strerror(std.c._errno().*),
-        });
-        std.process.exit(1);
-    }
-    seat.bar.*.redraw = true;
+    bar.redraw = true;
 }
 
 fn mode(
@@ -74,19 +72,18 @@ fn mode(
     _: ?*c.struct_zriver_seat_status_v1,
     name: [*c]const u8,
 ) callconv(.c) void {
-    var seat: *c.Seat = @ptrCast(@alignCast(data.?));
+    const seat: *c.Seat = @ptrCast(@alignCast(data.?));
     
-    if (seat.mode != null) {
-        c.free(seat.mode);
+    if (seat.mode) |ptr| {
+        c.free(ptr);
     }
     
-    seat.mode = c.strdup(name);
-    if (seat.mode == null) {
-        std.debug.print("strdup: {s}\n", .{
-            c.strerror(std.c._errno().*),
-        });
-        std.process.exit(1);
-    }
+    seat.mode = std.heap.c_allocator.dupeZ(
+        u8,
+        std.mem.span(name)
+    ) catch |err| {
+        @panic(@errorName(err));
+    };
     
     var bars = wl.List(c.Bar)
         .from(&lib.bar_list)

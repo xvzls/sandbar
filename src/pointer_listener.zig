@@ -16,7 +16,7 @@ fn enter(
     _: c.wl_fixed_t,
     _: c.wl_fixed_t,
 ) callconv(.c) void {
-    var seat: *c.Seat = @alignCast(@ptrCast(data.?));
+    const seat: *c.Seat = @ptrCast(@alignCast(data.?));
     
     seat.hovering = true;
     
@@ -61,7 +61,7 @@ fn leave(
     _: u32,
     _: ?*c.struct_wl_surface,
 ) callconv(.c) void {
-    var seat: *c.Seat = @alignCast(@ptrCast(data.?));
+    const seat: *c.Seat = @ptrCast(@alignCast(data.?));
     
     seat.hovering = false;
 }
@@ -74,7 +74,7 @@ fn button(
     code: u32,
     state: u32,
 ) callconv(.c) void {
-    var seat: *c.Seat = @alignCast(@ptrCast(data.?));
+    const seat: *c.Seat = @ptrCast(@alignCast(data.?));
     
     seat.pointer_button = if (
         state == c.WL_POINTER_BUTTON_STATE_PRESSED
@@ -88,7 +88,7 @@ fn motion(
     surface_x: c.wl_fixed_t,
     surface_y: c.wl_fixed_t,
 ) callconv(.c) void {
-    var seat: *c.Seat = @alignCast(@ptrCast(data.?));
+    const seat: *c.Seat = @alignCast(@ptrCast(data.?));
     
     seat.pointer_x = @intCast(
         c.wl_fixed_to_int(surface_x)
@@ -102,13 +102,10 @@ fn frame(
     data: ?*anyopaque,
     _: ?*c.struct_wl_pointer,
 ) callconv(.c) void {
-    var seat: *c.Seat = @alignCast(@ptrCast(data.?));
+    const seat: *c.Seat = @alignCast(@ptrCast(data.?));
+    const bar: *c.Bar = seat.bar orelse return;
     
-    if (
-        seat.pointer_button == 0 or
-        seat.bar == null or
-        !seat.hovering
-    ) {
+    if (seat.pointer_button == 0 or !seat.hovering) {
         return;
     }
     
@@ -120,15 +117,10 @@ fn frame(
     const one: u32 = 1;
     while (true) {
         if (c.hide_vacant) {
-            const active = (
-                seat.bar.*.mtags & one << i
-            ) != 0;
-            const occupied = (
-                seat.bar.*.ctags & one << i
-            ) != 0;
-            const urgent = (
-                seat.bar.*.urg & one << i
-            ) != 0;
+            const active = (bar.mtags & one << i) != 0;
+            const occupied = (bar.ctags & one << i) != 0;
+            const urgent = (bar.urg & one << i) != 0;
+            
             if (!active and !occupied and !urgent) {
                 continue;
             }
@@ -136,13 +128,14 @@ fn frame(
         
         x += lib.text_width(
             lib.tags[@intCast(i)],
-            seat.bar.*.width - x,
-            seat.bar.*.textpadding,
+            bar.width - x,
+            bar.textpadding,
             false,
         ) / lib.buffer_scale;
         
         if (seat.pointer_x >= x){
             i += 1;
+            
             if (i < lib.tags_l) {
                 continue;
             }
@@ -165,25 +158,22 @@ fn frame(
             cmd,
         );
         
-        var buf: [32]u8 = undefined;
-        _ = c.snprintf(
-            @ptrCast(&buf),
-            @sizeOf(@TypeOf(buf)),
-            "%d",
-            one << i,
-        );
+        const argument = std.fmt.allocPrintZ(
+            std.heap.c_allocator,
+            "{}",
+            .{ one << i },
+        ) catch |err| {
+            @panic(@errorName(err));
+        };
         c.zriver_control_v1_add_argument(
             c.river_control,
-            @ptrCast(&buf),
+            argument,
         );
         _ = c.zriver_control_v1_run_command(
             c.river_control,
             seat.wl_seat,
         );
-        return;
-    }
-    
-    if (true) {
+        
         return;
     }
     
@@ -194,8 +184,8 @@ fn frame(
     while (seats.next()) |it| {
         x += lib.text_width(
             it.mode,
-            seat.bar.*.width - x,
-            seat.bar.*.textpadding,
+            bar.width - x,
+            bar.textpadding,
             false,
         ) / lib.buffer_scale;
         
@@ -225,13 +215,14 @@ fn frame(
     
     // TODO: run custom commands upon clicking layout,
     // title, status
-    if ((seat.bar.*.mtags & seat.bar.*.ctags) != 0) {
+    if ((bar.mtags & bar.ctags) != 0) {
         x += lib.text_width(
-            seat.bar.*.layout,
-            seat.bar.*.width - x,
-            seat.bar.*.textpadding,
+            bar.layout,
+            bar.width - x,
+            bar.textpadding,
             false,
         ) / lib.buffer_scale;
+        
         if (seat.pointer_x < x) {
             // Clicked on layout
             return;
@@ -240,10 +231,10 @@ fn frame(
     
     if (
         seat.pointer_x <
-        seat.bar.*.width / lib.buffer_scale - lib.text_width(
-            seat.bar.*.status,
-            seat.bar.*.width - x,
-            seat.bar.*.textpadding,
+        bar.width / lib.buffer_scale - lib.text_width(
+            bar.status,
+            bar.width - x,
+            bar.textpadding,
             true,
         ) / lib.buffer_scale
     ) {

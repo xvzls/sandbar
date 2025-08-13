@@ -37,7 +37,7 @@ fn configure(
     bar.bufsize = bar.stride * bar.height;
     bar.configured = true;
     
-    _ = c.draw_frame(bar);
+    _ = lib.draw_frame(bar);
 }
 
 fn closed(

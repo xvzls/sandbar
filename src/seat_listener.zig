@@ -9,7 +9,7 @@ fn capabilities(
     _: ?*c.struct_wl_seat,
     code: u32,
 ) callconv(.c) void {
-    var seat: *c.Seat = @ptrCast(@alignCast(data.?));
+    const seat: *c.Seat = @ptrCast(@alignCast(data.?));
     
     const has_pointer = (
         code & c.WL_SEAT_CAPABILITY_POINTER

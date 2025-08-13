@@ -45,19 +45,18 @@ fn name(
     _: ?*c.struct_wl_output,
     output_name: [*c]const u8,
 ) callconv(.c) void {
-    var bar: *c.Bar = @alignCast(@ptrCast(data.?));
+    const bar: *c.Bar = @alignCast(@ptrCast(data.?));
     
-    if (bar.output_name != null) {
-        c.free(bar.output_name);
+    if (bar.output_name) |ptr| {
+        c.free(ptr);
     }
     
-    bar.output_name = c.strdup(output_name);
-    if (bar.output_name == null) {
-        std.debug.print("strdup: {s}\n", .{
-            c.strerror(std.c._errno().*),
-        });
-        std.process.exit(1);
-    }
+    bar.output_name = std.heap.c_allocator.dupeZ(
+        u8,
+        std.mem.span(output_name)
+    ) catch |err| {
+        @panic(@errorName(err));
+    };
 }
 
 fn scale(
