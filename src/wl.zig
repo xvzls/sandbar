@@ -50,3 +50,20 @@ pub fn List(comptime T: type) type {
     };
 }
 
+pub fn Array(comptime T: type) type {
+    return extern struct {
+        wl_array: c.wl_array,
+        
+        pub inline fn items(this: *@This()) []T {
+            var slice: []T = undefined;
+            
+            slice.ptr = @ptrCast(@alignCast(
+                this.wl_array.data
+            ));
+            slice.len = this.wl_array.size / @sizeOf(T);
+            
+            return slice;
+        }
+    };
+}
+

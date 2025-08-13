@@ -1266,13 +1266,10 @@ fn river_output_status_view_tags(
     
     bar.ctags = 0;
     
-    var items: []u32 = undefined;
-    items.ptr = @ptrCast(@alignCast(
-        wl_array.?.data.?
-    ));
-    items.len = wl_array.?.size / @sizeOf(u32);
-    
-    for (items) |item| {
+    for (@as(
+        *wl.Array(u32),
+        @ptrCast(wl_array.?)
+    ).items()) |item| {
         bar.ctags |= item;
     }
     bar.redraw = true;
@@ -1406,7 +1403,7 @@ fn river_seat_status_mode(
         std.process.exit(1);
     }
     
-    var bars = wl.List(c.Bar)
+    var bars = *wl.List(c.Bar)
         .from(&bar_list)
         .iterator("link");
     
