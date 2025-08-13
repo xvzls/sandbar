@@ -206,5 +206,8 @@ extern
 const struct zriver_output_status_v1_listener river_output_status_listener;
 
 extern
+const struct zriver_seat_status_v1_listener river_seat_status_listener;
+
+extern
 int c_main(int argc, char **argv);
 
