@@ -1,4 +1,5 @@
 const std = @import("std");
+const wl = @import("wl.zig");
 pub const c = @cImport({
     @cInclude("sandbar.h");
 });
@@ -244,14 +245,11 @@ fn draw_frame(
     }
     
     if (!no_mode) {
-        var pos: ?*c.wl_list = seat_list.next;
+        var seats = wl.List(c.Seat)
+            .from(&seat_list)
+            .iterator("link");
         
-        while (pos != &seat_list) : (pos = pos.?.next) {
-            const seat: *c.Seat = @fieldParentPtr(
-                "link",
-                pos.?,
-            );
-            
+        while (seats.next()) |seat| {
             if ((
                 hide_normal_mode and
                 (
@@ -995,14 +993,11 @@ fn pointer_frame(
         return;
     }
     
-    var pos: ?*c.wl_list = seat_list.next;
+    var seats = wl.List(c.Seat)
+        .from(&seat_list)
+        .iterator("link");
     
-    while (pos != &seat_list) : (pos = pos.?.next) {
-        const it: *c.Seat = @fieldParentPtr(
-            "link",
-            pos.?,
-        );
-        
+    while (seats.next()) |it| {
         x += text_width(
             it.mode,
             seat.bar.*.width - x,
@@ -1411,14 +1406,12 @@ fn river_seat_status_mode(
         std.process.exit(1);
     }
     
-    var pos: ?*c.wl_list = &bar_list;
+    var bars = wl.List(c.Bar)
+        .from(&bar_list)
+        .iterator("link");
     
-    while (pos != &bar_list) : (pos = pos.?.next) {
-        const bar: *c.Bar = @fieldParentPtr(
-            "link",
-            pos.?,
-        );
-        
+    while (bars.next()) |bar| {
+        std.debug.print("got em bars\n", .{});
         bar.redraw = true;
     }
 }
