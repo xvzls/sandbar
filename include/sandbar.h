@@ -182,6 +182,22 @@ uint32_t draw_text(
 );
 
 extern
+struct zwlr_layer_shell_v1 *layer_shell;
+
+
+extern
+struct wl_display *display;
+
+extern
+struct zriver_status_manager_v1 *river_status_manager;
+
+extern
+char *fontstr;
+
+extern
+void show_bar(Bar *bar);
+
+extern
 const struct wl_pointer_listener pointer_listener;
 
 extern

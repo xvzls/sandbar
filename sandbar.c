@@ -42,165 +42,27 @@
 	"	-v					get version information\n" \
 	"	-h					view this help text\n"
 
-static struct wl_display *display;
-static struct zwlr_layer_shell_v1 *layer_shell;
-static struct zriver_status_manager_v1 *river_status_manager;
+extern
+void hide_bar(Bar *bar);
 
-static char *fontstr = "monospace:size=16";
+extern
+void setup_bar(Bar *bar);
 
-static void
-show_bar(Bar *bar)
-{
-	bar->wl_surface = wl_compositor_create_surface(compositor);
-	if (!bar->wl_surface)
-		DIE("Could not create wl_surface");
+extern
+void setup_seat(Seat *seat);
 
-	bar->layer_surface = zwlr_layer_shell_v1_get_layer_surface(layer_shell, bar->wl_surface, bar->wl_output,
-								   ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM, PROGRAM);
-	if (!bar->layer_surface)
-		DIE("Could not create layer_surface");
-	zwlr_layer_surface_v1_add_listener(bar->layer_surface, &layer_surface_listener, bar);
+extern
+void handle_global(void *data, struct wl_registry *registry,
+          uint32_t name, const char *interface, uint32_t version);
 
-	zwlr_layer_surface_v1_set_size(bar->layer_surface, 0, bar->height / buffer_scale);
-	zwlr_layer_surface_v1_set_anchor(bar->layer_surface,
-					 (bar->bottom ? ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM : ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP)
-					 | ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT
-					 | ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT);
-	zwlr_layer_surface_v1_set_exclusive_zone(bar->layer_surface, bar->height / buffer_scale);
-	wl_surface_commit(bar->wl_surface);
+extern
+void teardown_bar(Bar *bar);
 
-	bar->hidden = false;
-}
+extern
+void teardown_seat(Seat *seat);
 
-static void
-hide_bar(Bar *bar)
-{
-	zwlr_layer_surface_v1_destroy(bar->layer_surface);
-	wl_surface_destroy(bar->wl_surface);
-
-	bar->configured = false;
-	bar->hidden = true;
-}
-
-static void
-setup_bar(Bar *bar)
-{
-	bar->height = height * buffer_scale;
-	bar->textpadding = textpadding;
-	bar->bottom = bottom;
-	bar->hidden = hidden;
-
-	if (!(bar->river_output_status = zriver_status_manager_v1_get_river_output_status(river_status_manager, bar->wl_output)))
-		DIE("Could not create river_output_status");
-	zriver_output_status_v1_add_listener(bar->river_output_status, &river_output_status_listener, bar);
-
-	if (!bar->hidden)
-		show_bar(bar);
-}
-
-static void
-setup_seat(Seat *seat)
-{
-	if (!(seat->river_seat_status = zriver_status_manager_v1_get_river_seat_status(river_status_manager, seat->wl_seat)))
-		DIE("Could not create river_seat_status");
-	zriver_seat_status_v1_add_listener(seat->river_seat_status, &river_seat_status_listener, seat);
-}
-
-static void
-handle_global(void *data, struct wl_registry *registry,
-	      uint32_t name, const char *interface, uint32_t version)
-{
-	if (!strcmp(interface, wl_compositor_interface.name)) {
-		compositor = wl_registry_bind(registry, name, &wl_compositor_interface, 4);
-	} else if (!strcmp(interface, wl_shm_interface.name)) {
-		shm = wl_registry_bind(registry, name, &wl_shm_interface, 1);
-	} else if (!strcmp(interface, zwlr_layer_shell_v1_interface.name)) {
-		layer_shell = wl_registry_bind(registry, name, &zwlr_layer_shell_v1_interface, 1);
-	} else if (!strcmp(interface, zriver_status_manager_v1_interface.name)) {
-		river_status_manager = wl_registry_bind(registry, name, &zriver_status_manager_v1_interface, 4);
-	} else if (!strcmp(interface, zriver_control_v1_interface.name)) {
-		river_control = wl_registry_bind(registry, name, &zriver_control_v1_interface, 1);
-	} else if (!strcmp(interface, wl_output_interface.name)) {
-		Bar *bar = calloc(1, sizeof(Bar));
-		if (!bar)
-			EDIE("calloc");
-		bar->registry_name = name;
-		bar->wl_output = wl_registry_bind(registry, name, &wl_output_interface, 4);
-		wl_output_add_listener(bar->wl_output, &output_listener, bar);
-		if (run_display)
-			setup_bar(bar);
-		wl_list_insert(&bar_list, &bar->link);
-	} else if (!strcmp(interface, wl_seat_interface.name)) {
-		Seat *seat = calloc(1, sizeof(Seat));
-		if (!seat)
-			EDIE("calloc");
-		seat->registry_name = name;
-		seat->wl_seat = wl_registry_bind(registry, name, &wl_seat_interface, 7);
-		wl_seat_add_listener(seat->wl_seat, &seat_listener, seat);
-		if (run_display)
-			setup_seat(seat);
-		wl_list_insert(&seat_list, &seat->link);
-	}
-}
-
-static void
-teardown_bar(Bar *bar)
-{
-	if (bar->title)
-		free(bar->title);
-	if (bar->layout)
-		free(bar->layout);
-	if (bar->status)
-		free(bar->status);
-	if (bar->output_name)
-		free(bar->output_name);
-	zriver_output_status_v1_destroy(bar->river_output_status);
-	if (!bar->hidden) {
-		zwlr_layer_surface_v1_destroy(bar->layer_surface);
-		wl_surface_destroy(bar->wl_surface);
-	}
-	wl_output_destroy(bar->wl_output);
-	free(bar);
-}
-
-static void
-teardown_seat(Seat *seat)
-{
-	if (seat->mode)
-		free(seat->mode);
-	zriver_seat_status_v1_destroy(seat->river_seat_status);
-	if (seat->wl_pointer)
-		wl_pointer_destroy(seat->wl_pointer);
-	wl_seat_destroy(seat->wl_seat);
-	free(seat);
-}
-
-static void
-handle_global_remove(void *data, struct wl_registry *registry, uint32_t name)
-{
-	Bar *bar;
-	Seat *seat;
-	
-	wl_list_for_each(bar, &bar_list, link) {
-		if (bar->registry_name == name) {
-			wl_list_remove(&bar->link);
-			teardown_bar(bar);
-			return;
-		}
-	}
-	wl_list_for_each(seat, &seat_list, link) {
-		if (seat->registry_name == name) {
-			wl_list_remove(&seat->link);
-			teardown_seat(seat);
-			return;
-		}
-	}
-}
-
-static const struct wl_registry_listener registry_listener = {
-	.global = handle_global,
-	.global_remove = handle_global_remove
-};
+extern
+const struct wl_registry_listener registry_listener;
 
 static void
 set_status(Bar *bar, char *data)

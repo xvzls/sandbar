@@ -26,6 +26,9 @@ pub export
 const river_seat_status_listener = @import("river_seat_status_listener.zig").object;
 
 pub export
+const registry_listener = @import("registry_listener.zig").object;
+
+pub export
 var active_fg_color = c.pixman_color_t{
     .red = 0xeeee,
     .green = 0xeeee,
@@ -101,6 +104,169 @@ var vertical_padding: u32 = 1;
 
 pub export
 var buffer_scale: u32 = 1;
+
+pub export
+var layer_shell: ?*c.struct_zwlr_layer_shell_v1 = null;
+
+pub export
+var display: ?*c.struct_wl_display = null;
+
+pub export
+var river_status_manager: ?*c.struct_zriver_status_manager_v1 = null;
+
+pub export
+var fontstr: [*c]const u8 = "monospace:size=16";
+
+pub export
+const PROGRAM = "sandbar";
+
+pub export
+fn show_bar(bar: *c.Bar) callconv(.c) void {
+    bar.wl_surface = c.wl_compositor_create_surface(
+        compositor
+    );
+    if (bar.wl_surface == null) {
+        @panic("Could not create wl_surface");
+    }
+    
+    bar.layer_surface = c.zwlr_layer_shell_v1_get_layer_surface(
+        layer_shell,
+        bar.wl_surface,
+        bar.wl_output,
+        c.ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM,
+        PROGRAM,
+    );
+    if (bar.layer_surface == null) {
+        @panic("Could not create layer_surface");
+    }
+    
+    _ = c.zwlr_layer_surface_v1_add_listener(
+        bar.layer_surface,
+        &layer_surface_listener,
+        bar,
+    );
+    
+    c.zwlr_layer_surface_v1_set_size(
+        bar.layer_surface,
+        0,
+        bar.height / buffer_scale,
+    );
+    c.zwlr_layer_surface_v1_set_anchor(
+        bar.layer_surface,
+        @intCast(
+            (if (bar.bottom)
+                c.ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM
+            else
+                c.ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP
+            )
+                | c.ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT
+                | c.ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT,
+        )
+    );
+    c.zwlr_layer_surface_v1_set_exclusive_zone(
+        bar.layer_surface,
+        @intCast(bar.height / buffer_scale),
+    );
+    c.wl_surface_commit(bar.wl_surface);
+    
+    bar.hidden = false;
+}
+
+pub export
+fn hide_bar(bar: *c.Bar) void {
+    c.zwlr_layer_surface_v1_destroy(bar.layer_surface);
+    c.wl_surface_destroy(bar.wl_surface);
+    
+    bar.configured = false;
+    bar.hidden = true;
+}
+
+pub export
+fn setup_bar(bar: *c.Bar) void {
+    bar.height = height * buffer_scale;
+    bar.textpadding = textpadding;
+    bar.bottom = bottom;
+    bar.hidden = hidden;
+    
+    bar.river_output_status = c.zriver_status_manager_v1_get_river_output_status(
+        river_status_manager,
+        bar.wl_output
+    );
+    if (bar.river_output_status == null) {
+        @panic("Could not create river_output_status");
+    }
+    
+    _ = c.zriver_output_status_v1_add_listener(
+        bar.river_output_status,
+        &river_output_status_listener,
+        bar,
+    );
+    
+    if (!bar.hidden) {
+        show_bar(bar);
+    }
+}
+
+pub export
+fn setup_seat(seat: *c.Seat) void {
+    seat.river_seat_status = c.zriver_status_manager_v1_get_river_seat_status(
+        river_status_manager,
+        seat.wl_seat,
+    ) orelse @panic("Could not create river_seat_status");
+    _ = c.zriver_seat_status_v1_add_listener(
+        seat.river_seat_status,
+        &river_seat_status_listener,
+        seat,
+    );
+}
+
+pub export
+fn teardown_bar(bar: *c.Bar) void {
+    if (bar.title) |ptr| {
+        c.free(ptr);
+    }
+    if (bar.layout) |ptr| {
+        c.free(ptr);
+    }
+    if (bar.status) |ptr| {
+        c.free(ptr);
+    }
+    if (bar.output_name) |ptr| {
+        c.free(ptr);
+    }
+    
+    c.zriver_output_status_v1_destroy(
+        bar.river_output_status,
+    );
+    
+    if (!bar.hidden) {
+        c.zwlr_layer_surface_v1_destroy(
+            bar.layer_surface,
+        );
+        c.wl_surface_destroy(bar.wl_surface);
+    }
+    
+    c.wl_output_destroy(bar.wl_output);
+    c.free(bar);
+}
+
+pub export
+fn teardown_seat(seat: *c.Seat) void {
+    if (seat.mode) |ptr| {
+        c.free(ptr);
+    }
+    
+    c.zriver_seat_status_v1_destroy(
+        seat.river_seat_status
+    );
+    
+    if (seat.wl_pointer) |ptr| {
+        c.wl_pointer_destroy(ptr);
+    }
+    
+    c.wl_seat_destroy(seat.wl_seat);
+    c.free(seat);
+}
 
 pub export
 fn draw_frame(
