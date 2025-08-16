@@ -984,3 +984,170 @@ fn draw_text(
 pub export
 var run_display = false;
 
+pub export
+fn set_status(bar: *c.Bar, data: [*c]const u8) void {
+    if (bar.status) |ptr| {
+        c.free(ptr);
+    }
+    bar.status = c.strdup(data) orelse @panic("strdup");
+    
+    bar.redraw = true;
+}
+
+pub export
+fn set_visible(bar: *c.Bar, _: [*c]const u8) void {
+    if (bar.hidden) {
+        show_bar(bar);
+    }
+}
+
+pub export
+fn set_invisible(bar: *c.Bar, _: [*c]const u8) void {
+    if (!bar.hidden) {
+        hide_bar(bar);
+    }
+}
+
+pub export
+fn toggle_visibility(bar: *c.Bar, _: [*c]const u8) void {
+    if (bar.hidden) {
+        show_bar(bar);
+    } else {
+        hide_bar(bar);
+    }
+}
+
+pub export
+fn set_top(bar: *c.Bar, _: [*c]const u8) void {
+    if (!bar.hidden) {
+        c.zwlr_layer_surface_v1_set_anchor(
+            bar.layer_surface,
+            c.ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP
+                | c.ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT
+                | c.ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT
+        );
+        bar.redraw = true;
+    }
+    
+    bar.bottom = false;
+}
+
+pub export
+fn set_bottom(bar: *c.Bar, _: [*c]const u8) void {
+    if (!bar.hidden) {
+        c.zwlr_layer_surface_v1_set_anchor(
+            bar.layer_surface,
+            c.ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM
+                | c.ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT
+                | c.ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT
+        );
+        bar.redraw = true;
+    }
+    
+    bar.bottom = true;
+}
+
+pub export
+fn toggle_location(bar: *c.Bar, _: [*c]const u8) void {
+    if (bar.bottom) {
+        set_top(bar, null);
+    } else {
+        set_bottom(bar, null);
+    }
+}
+
+pub export
+fn debug_string(
+    chars: [*c]const u8,
+    size: isize
+) void {
+    var string: []const u8 = undefined;
+    string.len = @intCast(size);
+    string.ptr = chars;
+    
+    std.debug.print("debug: '{s}'", .{ string });
+}
+
+inline
+fn find_function(
+    command: []const u8
+) ?*const fn(
+    bar: *c.Bar,
+    data: [*c]const u8,
+) callconv(.c) void {
+    const commands = .{
+        .@"status" = set_status,
+        .@"hide" = set_visible,
+        .@"toggle-visibility" = toggle_location,
+        .@"set-top" = set_top,
+        .@"set-bottom" = set_bottom,
+        .@"toggle-location" = toggle_location,
+    };
+    
+    inline for (
+        std.meta.fields(@TypeOf(commands))
+    ) |field| {
+        if (std.mem.eql(u8, field.name, command)) {
+            return @field(commands, field.name);
+        }
+    }
+    
+    return null;
+}
+
+pub export
+fn read_stdin() c_int {
+    const in = std.io.getStdIn().reader();
+    var buffer: [8192]u8 = undefined;
+    
+    const line = in.readUntilDelimiter(
+        &buffer,
+        '\n',
+    ) catch |err| @panic(@errorName(err));
+    std.debug.print("line: {s}\n", .{ line });
+    
+    var words = std.mem.splitScalar(u8, line, ' ');
+    const output =
+        words.next()
+    orelse
+        @panic("no output param in input");
+    const command =
+        words.next()
+    orelse
+        @panic("no command param in input");
+    const dataOld = words.rest();
+    const data = c.strndup(@ptrCast(dataOld), dataOld.len);
+    
+    var bars = wl.List(c.Bar)
+        .from(&bar_list)
+        .iterator("link");
+    
+    const function = find_function(command) orelse @panic("invalid command");
+    
+    if (std.mem.eql(u8, output, "all")) {
+        while (bars.next()) |bar| {
+            function(bar, data);
+        }
+    } else if (std.mem.eql(u8, output, "selected")) {
+        while (bars.next()) |bar| {
+            if (bar.sel) {
+                function(bar, data);
+            }
+        }
+    } else {
+        while (bars.next()) |bar| {
+            if (bar.output_name) |name| {
+                if (std.mem.eql(
+                    u8,
+                    output,
+                    std.mem.span(name),
+                )) {
+                    function(bar, data);
+                }
+            }
+        }
+    }
+    
+    return 1;
+}
+

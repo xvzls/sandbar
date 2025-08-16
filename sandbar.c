@@ -64,73 +64,26 @@ void teardown_seat(Seat *seat);
 extern
 const struct wl_registry_listener registry_listener;
 
-static void
-set_status(Bar *bar, char *data)
-{
-	if (bar->status)
-		free(bar->status);
-	if (!(bar->status = strdup(data)))
-		EDIE("strdup");
-	bar->redraw = true;
-}
+extern
+void set_status(Bar *bar, char *data);
 
-static void
-set_visible(Bar *bar, char *data)
-{
-	if (bar->hidden)
-		show_bar(bar);
-}
+extern
+void set_visible(Bar *bar, char *data);
 
-static void
-set_invisible(Bar *bar, char *data)
-{
-	if (!bar->hidden)
-		hide_bar(bar);
-}
+extern
+void set_invisible(Bar *bar, char *data);
 
-static void
-toggle_visibility(Bar *bar, char *data)
-{
-	if (bar->hidden)
-		show_bar(bar);
-	else
-		hide_bar(bar);
-}
+extern
+void toggle_visibility(Bar *bar, char *data);
 
-static void
-set_top(Bar *bar, char *data)
-{
-	if (!bar->hidden) {
-		zwlr_layer_surface_v1_set_anchor(bar->layer_surface,
-						 ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP
-						 | ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT
-						 | ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT);
-		bar->redraw = true;
-	}
-	bar->bottom = false;
-}
+extern
+void set_top(Bar *bar, char *data);
 
-static void
-set_bottom(Bar *bar, char *data)
-{
-	if (!bar->hidden) {
-		zwlr_layer_surface_v1_set_anchor(bar->layer_surface,
-						 ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM
-						 | ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT
-						 | ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT);
-		bar->redraw = true;
-	}
-	bar->bottom = true;
-}
+extern
+void set_bottom(Bar *bar, char *data);
 
-static void
-toggle_location(Bar *bar, char *data)
-{
-	if (bar->bottom)
-		set_top(bar, NULL);
-	else
-		set_bottom(bar, NULL);
-}
+extern
+void toggle_location(Bar *bar, char *data);
 
 static int
 advance_word(char **beg, char **end)
@@ -145,69 +98,76 @@ advance_word(char **beg, char **end)
 	return 0;
 }
 
-static int
-read_stdin(void)
-{
-	char buf[8192];
-	ssize_t len = read(STDIN_FILENO, buf, sizeof(buf));
-	if (len == -1)
-		EDIE("read");
-	if (len == 0)
-		return -1;
+extern
+void debug_string(const char *chars, ssize_t size);
+
+extern
+int read_stdin();
+
+// static int
+// read_stdin(void)
+// {
+// 	char buf[8192];
+// 	ssize_t len = read(STDIN_FILENO, buf, sizeof(buf));
+// 	if (len == -1)
+// 		EDIE("read");
+// 	if (len == 0)
+// 		return -1;
 	
-	char *linebeg, *lineend, *wordbeg, *wordend;
-	for (linebeg = (char *)&buf;
-	     (lineend = memchr(linebeg, '\n', (char *)&buf + len - linebeg));
-	     linebeg = lineend) {
-		*lineend++ = '\0';
+// 	// debug_string(buf, len);
+// 	char *linebeg, *lineend, *wordbeg, *wordend;
+// 	for (linebeg = (char *)&buf;
+// 	     (lineend = memchr(linebeg, '\n', (char *)&buf + len - linebeg));
+// 	     linebeg = lineend) {
+// 		*lineend++ = '\0';
 
-		wordend = linebeg;
-		if (advance_word(&wordbeg, &wordend) == -1)
-			continue;
-		char *output = wordbeg;
-		advance_word(&wordbeg, &wordend);
+// 		wordend = linebeg;
+// 		if (advance_word(&wordbeg, &wordend) == -1)
+// 			continue;
+// 		char *output = wordbeg;
+// 		advance_word(&wordbeg, &wordend);
 
-		void (*func)(Bar *, char *);
-		if (!strcmp(wordbeg, "status")) {
-			if (!*wordend)
-				continue;
-			func = set_status;
-		} else if (!strcmp(wordbeg, "show")) {
-			func = set_visible;
-		} else if (!strcmp(wordbeg, "hide")) {
-			func = set_invisible;
-		} else if (!strcmp(wordbeg, "toggle-visibility")) {
-			func = toggle_visibility;
-		} else if (!strcmp(wordbeg, "set-top")) {
-			func = set_top;
-		} else if (!strcmp(wordbeg, "set-bottom")) {
-			func = set_bottom;
-		} else if (!strcmp(wordbeg, "toggle-location")) {
-			func = toggle_location;
-		} else {
-			continue;
-		}
+// 		void (*func)(Bar *, char *);
+// 		if (!strcmp(wordbeg, "status")) {
+// 			if (!*wordend)
+// 				continue;
+// 			func = set_status;
+// 		} else if (!strcmp(wordbeg, "show")) {
+// 			func = set_visible;
+// 		} else if (!strcmp(wordbeg, "hide")) {
+// 			func = set_invisible;
+// 		} else if (!strcmp(wordbeg, "toggle-visibility")) {
+// 			func = toggle_visibility;
+// 		} else if (!strcmp(wordbeg, "set-top")) {
+// 			func = set_top;
+// 		} else if (!strcmp(wordbeg, "set-bottom")) {
+// 			func = set_bottom;
+// 		} else if (!strcmp(wordbeg, "toggle-location")) {
+// 			func = toggle_location;
+// 		} else {
+// 			continue;
+// 		}
 		
-		Bar *bar;
-		if (!strcmp(output, "all")) {
-			wl_list_for_each(bar, &bar_list, link)
-				func(bar, wordend);
-		} else if (!strcmp(output, "selected")) {
-			wl_list_for_each(bar, &bar_list, link)
-				if (bar->sel)
-					func(bar, wordend);
-		} else {
-			wl_list_for_each(bar, &bar_list, link) {
-				if (bar->output_name && !strcmp(output, bar->output_name)) {
-					func(bar, wordend);
-					break;
-				}
-			}
-		}
-	}
+// 		Bar *bar;
+// 		if (!strcmp(output, "all")) {
+// 			wl_list_for_each(bar, &bar_list, link)
+// 				func(bar, wordend);
+// 		} else if (!strcmp(output, "selected")) {
+// 			wl_list_for_each(bar, &bar_list, link)
+// 				if (bar->sel)
+// 					func(bar, wordend);
+// 		} else {
+// 			wl_list_for_each(bar, &bar_list, link) {
+// 				if (bar->output_name && !strcmp(output, bar->output_name)) {
+// 					func(bar, wordend);
+// 					break;
+// 				}
+// 			}
+// 		}
+// 	}
 	
-	return 0;
-}
+// 	return 0;
+// }
 
 static void
 event_loop(void)
