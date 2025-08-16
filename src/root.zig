@@ -984,32 +984,34 @@ fn draw_text(
 pub export
 var run_display = false;
 
-pub export
-fn set_status(bar: *c.Bar, data: [*c]const u8) void {
+fn set_status(bar: *c.Bar, data: ?[]const u8) void {
     if (bar.status) |ptr| {
         c.free(ptr);
     }
-    bar.status = c.strdup(data) orelse @panic("strdup");
+    bar.status = std.heap.c_allocator.dupeZ(
+        u8,
+        data.?
+    ) catch |err| @panic(@errorName(err));
     
     bar.redraw = true;
 }
 
-pub export
-fn set_visible(bar: *c.Bar, _: [*c]const u8) void {
+fn set_visible(bar: *c.Bar, _: ?[]const u8) void {
     if (bar.hidden) {
         show_bar(bar);
     }
 }
 
-pub export
-fn set_invisible(bar: *c.Bar, _: [*c]const u8) void {
+fn set_invisible(bar: *c.Bar, _: ?[]const u8) void {
     if (!bar.hidden) {
         hide_bar(bar);
     }
 }
 
-pub export
-fn toggle_visibility(bar: *c.Bar, _: [*c]const u8) void {
+fn toggle_visibility(
+    bar: *c.Bar,
+    _: ?[]const u8,
+) void {
     if (bar.hidden) {
         show_bar(bar);
     } else {
@@ -1017,8 +1019,7 @@ fn toggle_visibility(bar: *c.Bar, _: [*c]const u8) void {
     }
 }
 
-pub export
-fn set_top(bar: *c.Bar, _: [*c]const u8) void {
+fn set_top(bar: *c.Bar, _: ?[]const u8) void {
     if (!bar.hidden) {
         c.zwlr_layer_surface_v1_set_anchor(
             bar.layer_surface,
@@ -1032,8 +1033,7 @@ fn set_top(bar: *c.Bar, _: [*c]const u8) void {
     bar.bottom = false;
 }
 
-pub export
-fn set_bottom(bar: *c.Bar, _: [*c]const u8) void {
+fn set_bottom(bar: *c.Bar, _: ?[]const u8) void {
     if (!bar.hidden) {
         c.zwlr_layer_surface_v1_set_anchor(
             bar.layer_surface,
@@ -1047,8 +1047,7 @@ fn set_bottom(bar: *c.Bar, _: [*c]const u8) void {
     bar.bottom = true;
 }
 
-pub export
-fn toggle_location(bar: *c.Bar, _: [*c]const u8) void {
+fn toggle_location(bar: *c.Bar, _: ?[]const u8) void {
     if (bar.bottom) {
         set_top(bar, null);
     } else {
@@ -1056,25 +1055,13 @@ fn toggle_location(bar: *c.Bar, _: [*c]const u8) void {
     }
 }
 
-pub export
-fn debug_string(
-    chars: [*c]const u8,
-    size: isize
-) void {
-    var string: []const u8 = undefined;
-    string.len = @intCast(size);
-    string.ptr = chars;
-    
-    std.debug.print("debug: '{s}'", .{ string });
-}
-
 inline
 fn find_function(
     command: []const u8
 ) ?*const fn(
     bar: *c.Bar,
-    data: [*c]const u8,
-) callconv(.c) void {
+    data: ?[]const u8,
+) void {
     const commands = .{
         .@"status" = set_status,
         .@"hide" = set_visible,
@@ -1104,7 +1091,6 @@ fn read_stdin() c_int {
         &buffer,
         '\n',
     ) catch |err| @panic(@errorName(err));
-    std.debug.print("line: {s}\n", .{ line });
     
     var words = std.mem.splitScalar(u8, line, ' ');
     const output =
@@ -1115,8 +1101,7 @@ fn read_stdin() c_int {
         words.next()
     orelse
         @panic("no command param in input");
-    const dataOld = words.rest();
-    const data = c.strndup(@ptrCast(dataOld), dataOld.len);
+    const data = words.rest();
     
     var bars = wl.List(c.Bar)
         .from(&bar_list)
