@@ -1107,7 +1107,10 @@ fn read_stdin() c_int {
         .from(&bar_list)
         .iterator("link");
     
-    const function = find_function(command) orelse @panic("invalid command");
+    const function =
+        find_function(command)
+    orelse
+        @panic("invalid command");
     
     if (std.mem.eql(u8, output, "all")) {
         while (bars.next()) |bar| {
@@ -1134,5 +1137,66 @@ fn read_stdin() c_int {
     }
     
     return 1;
+}
+
+pub export
+fn event_loop() void {
+    var fds = [_]c.struct_pollfd{
+        .{
+            .fd = c.wl_display_get_fd(display),
+            .events = c.POLLIN,
+            .revents = 0,
+        },
+        .{
+            .fd = c.STDIN_FILENO,
+            .events = c.POLLIN,
+            .revents = 0,
+        },
+    };
+    
+    while (run_display) {
+        _ = c.wl_display_flush(display);
+        
+        if (c.poll(&fds, 2, -1) < 0) {
+            if (std.c._errno().* == c.EINTR) {
+                continue;
+            }
+            @panic("bad poll");
+        }
+        
+        if ((fds[0].revents & c.POLLIN) != 0) {
+            if (c.wl_display_dispatch(display) == -1) {
+                break;
+            }
+        }
+        if ((fds[1].revents & c.POLLIN) != 0) {
+            if (read_stdin() == -1) {
+                break;
+            }
+        }
+        
+        var bars = wl.List(c.Bar)
+            .from(&bar_list)
+            .iterator("link");
+        while (bars.next()) |bar| {
+            if (bar.redraw) {
+                if (!bar.hidden) {
+                    _ = draw_frame(bar);
+                }
+                bar.redraw = false;
+            }
+        }
+    }
+}
+
+pub export
+fn sig_handler(signal: c_int) void {
+    if (
+        signal == c.SIGINT or
+        signal == c.SIGHUP or
+        signal == c.SIGTERM
+    ) {
+        run_display = false;
+    }
 }
 

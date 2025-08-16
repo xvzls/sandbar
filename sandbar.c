@@ -67,50 +67,11 @@ const struct wl_registry_listener registry_listener;
 extern
 int read_stdin();
 
-static void
-event_loop(void)
-{
-	int wl_fd = wl_display_get_fd(display);
+extern
+void event_loop();
 
-	while (run_display) {
-		fd_set rfds;
-		FD_ZERO(&rfds);
-		FD_SET(wl_fd, &rfds);
-		FD_SET(STDIN_FILENO, &rfds);
-
-		wl_display_flush(display);
-
-		if (select(wl_fd + 1, &rfds, NULL, NULL, NULL) == -1) {
-			if (errno == EINTR)
-				continue;
-			else
-				EDIE("select");
-		}
-		
-		if (FD_ISSET(wl_fd, &rfds))
-			if (wl_display_dispatch(display) == -1)
-				break;
-		if (FD_ISSET(STDIN_FILENO, &rfds))
-			if (read_stdin() == -1)
-				break;
-		
-		Bar *bar;
-		wl_list_for_each(bar, &bar_list, link) {
-			if (bar->redraw) {
-				if (!bar->hidden)
-					draw_frame(bar);
-				bar->redraw = false;
-			}
-		}
-	}
-}
-
-void
-sig_handler(int sig)
-{
-	if (sig == SIGINT || sig == SIGHUP || sig == SIGTERM)
-		run_display = false;
-}
+extern
+void sig_handler(int sig);
 
 int
 c_main(int argc, char **argv)
