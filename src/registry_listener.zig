@@ -1,9 +1,7 @@
 const lib = @import("root.zig");
 const std = @import("std");
-const wl = @import("wl.zig");
-pub const c = @cImport({
-    @cInclude("sandbar.h");
-});
+const wl = lib.wl;
+const c = lib.c;
 
 fn global(
     _: ?*anyopaque,
@@ -66,8 +64,8 @@ fn global(
         interface,
         c.wl_output_interface.name
     ) == 0) {
-        const bar: *c.Bar = std.heap.c_allocator.create(c.Bar) catch |err| @panic(@errorName(err));
-        bar.* = std.mem.zeroes(c.Bar);
+        const bar: *lib.Bar = std.heap.c_allocator.create(lib.Bar) catch |err| @panic(@errorName(err));
+        bar.* = std.mem.zeroes(lib.Bar);
         
         bar.registry_name = name;
         bar.wl_output = @ptrCast(@alignCast(c.wl_registry_bind(
@@ -89,8 +87,8 @@ fn global(
         interface,
         c.wl_seat_interface.name
     ) == 0) {
-        const seat: *c.Seat = std.heap.c_allocator.create(c.Seat) catch |err| @panic(@errorName(err));
-        seat.* = std.mem.zeroes(c.Seat);
+        const seat: *lib.Seat = std.heap.c_allocator.create(lib.Seat) catch |err| @panic(@errorName(err));
+        seat.* = std.mem.zeroes(lib.Seat);
         
         seat.registry_name = name;
         seat.wl_seat = @ptrCast(@alignCast(c.wl_registry_bind(
@@ -116,7 +114,7 @@ fn global_remove(
     _: ?*c.struct_wl_registry,
     name: u32,
 ) callconv(.c) void {
-    var bars = wl.List(c.Bar)
+    var bars = wl.List(lib.Bar)
         .from(&lib.bar_list)
         .iterator("link");
     
@@ -128,7 +126,7 @@ fn global_remove(
         }
     }
     
-    var seats = wl.List(c.Seat)
+    var seats = wl.List(lib.Seat)
         .from(&lib.seat_list)
         .iterator("link");
     

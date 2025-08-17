@@ -4,31 +4,34 @@ pub const c = @cImport({
     @cInclude("sandbar.h");
 });
 
-pub export
+pub const Bar = @import("Bar.zig");
+pub const Seat = @import("Seat.zig");
+
+pub
 const wl_buffer_listener = @import("wl_buffer_listener.zig").object;
 
-pub export
+pub
 const pointer_listener = @import("pointer_listener.zig").object;
 
-pub export
+pub
 const output_listener = @import("output_listener.zig").object;
 
-pub export
+pub
 const layer_surface_listener = @import("layer_surface_listener.zig").object;
 
-pub export
+pub
 const seat_listener = @import("seat_listener.zig").object;
 
-pub export
+pub
 const river_output_status_listener = @import("river_output_status_listener.zig").object;
 
-pub export
+pub
 const river_seat_status_listener = @import("river_seat_status_listener.zig").object;
 
-pub export
+pub
 const registry_listener = @import("registry_listener.zig").object;
 
-pub export
+pub
 var active_fg_color = c.pixman_color_t{
     .red = 0xeeee,
     .green = 0xeeee,
@@ -36,7 +39,7 @@ var active_fg_color = c.pixman_color_t{
     .alpha = 0xffff,
 };
 
-pub export
+pub
 var active_bg_color = c.pixman_color_t{
     .red = 0x0000,
     .green = 0x5555,
@@ -44,7 +47,7 @@ var active_bg_color = c.pixman_color_t{
     .alpha = 0xffff,
 };
 
-pub export
+pub
 var inactive_fg_color = c.pixman_color_t{
     .red = 0xbbbb,
     .green = 0xbbbb,
@@ -52,7 +55,7 @@ var inactive_fg_color = c.pixman_color_t{
     .alpha = 0xffff,
 };
 
-pub export
+pub
 var inactive_bg_color = c.pixman_color_t{
     .red = 0x2222,
     .green = 0x2222,
@@ -60,7 +63,7 @@ var inactive_bg_color = c.pixman_color_t{
     .alpha = 0xffff,
 };
 
-pub export
+pub
 var urgent_fg_color = c.pixman_color_t{
     .red = 0x2222,
     .green = 0x2222,
@@ -68,7 +71,7 @@ var urgent_fg_color = c.pixman_color_t{
     .alpha = 0xffff,
 };
 
-pub export
+pub
 var urgent_bg_color = c.pixman_color_t{
     .red = 0xeeee,
     .green = 0xeeee,
@@ -76,7 +79,7 @@ var urgent_bg_color = c.pixman_color_t{
     .alpha = 0xffff,
 };
 
-pub export
+pub
 var title_fg_color = c.pixman_color_t{
     .red = 0xeeee,
     .green = 0xeeee,
@@ -84,7 +87,7 @@ var title_fg_color = c.pixman_color_t{
     .alpha = 0xffff,
 };
 
-pub export
+pub
 var title_bg_color = c.pixman_color_t{
     .red = 0x0000,
     .green = 0x5555,
@@ -93,41 +96,35 @@ var title_bg_color = c.pixman_color_t{
 };
 
 
-pub export
+pub
 var height: u32 = 0;
 
-pub export
+pub
 var textpadding: u32 = 0;
 
-pub export
+pub
 var vertical_padding: u32 = 1;
 
-pub export
+pub
 var buffer_scale: u32 = 1;
 
-pub export
+pub
 var layer_shell: ?*c.struct_zwlr_layer_shell_v1 = null;
 
-pub export
+pub
 var display: ?*c.struct_wl_display = null;
 
-pub export
+pub
 var river_status_manager: ?*c.struct_zriver_status_manager_v1 = null;
 
-pub export
-var fontstr: [*c]const u8 = "monospace:size=16";
-
-pub export
+pub
 const PROGRAM = "sandbar";
 
-pub export
-fn show_bar(bar: *c.Bar) callconv(.c) void {
+pub
+fn show_bar(bar: *Bar) callconv(.c) void {
     bar.wl_surface = c.wl_compositor_create_surface(
         compositor
-    );
-    if (bar.wl_surface == null) {
-        @panic("Could not create wl_surface");
-    }
+    ) orelse @panic("Could not create wl_surface");
     
     bar.layer_surface = c.zwlr_layer_shell_v1_get_layer_surface(
         layer_shell,
@@ -135,10 +132,7 @@ fn show_bar(bar: *c.Bar) callconv(.c) void {
         bar.wl_output,
         c.ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM,
         PROGRAM,
-    );
-    if (bar.layer_surface == null) {
-        @panic("Could not create layer_surface");
-    }
+    ) orelse @panic("Could not create layer_surface");
     
     _ = c.zwlr_layer_surface_v1_add_listener(
         bar.layer_surface,
@@ -172,8 +166,8 @@ fn show_bar(bar: *c.Bar) callconv(.c) void {
     bar.hidden = false;
 }
 
-pub export
-fn hide_bar(bar: *c.Bar) void {
+pub
+fn hide_bar(bar: *Bar) void {
     c.zwlr_layer_surface_v1_destroy(bar.layer_surface);
     c.wl_surface_destroy(bar.wl_surface);
     
@@ -181,8 +175,8 @@ fn hide_bar(bar: *c.Bar) void {
     bar.hidden = true;
 }
 
-pub export
-fn setup_bar(bar: *c.Bar) void {
+pub
+fn setup_bar(bar: *Bar) void {
     bar.height = height * buffer_scale;
     bar.textpadding = textpadding;
     bar.bottom = bottom;
@@ -191,10 +185,7 @@ fn setup_bar(bar: *c.Bar) void {
     bar.river_output_status = c.zriver_status_manager_v1_get_river_output_status(
         river_status_manager,
         bar.wl_output
-    );
-    if (bar.river_output_status == null) {
-        @panic("Could not create river_output_status");
-    }
+    ) orelse @panic("Could not create river_output_status");
     
     _ = c.zriver_output_status_v1_add_listener(
         bar.river_output_status,
@@ -207,8 +198,8 @@ fn setup_bar(bar: *c.Bar) void {
     }
 }
 
-pub export
-fn setup_seat(seat: *c.Seat) void {
+pub
+fn setup_seat(seat: *Seat) void {
     seat.river_seat_status = c.zriver_status_manager_v1_get_river_seat_status(
         river_status_manager,
         seat.wl_seat,
@@ -220,8 +211,8 @@ fn setup_seat(seat: *c.Seat) void {
     );
 }
 
-pub export
-fn teardown_bar(bar: *c.Bar) void {
+pub
+fn teardown_bar(bar: *Bar) void {
     if (bar.title) |ptr| {
         c.free(ptr);
     }
@@ -250,8 +241,8 @@ fn teardown_bar(bar: *c.Bar) void {
     c.free(bar);
 }
 
-pub export
-fn teardown_seat(seat: *c.Seat) void {
+pub
+fn teardown_seat(seat: *Seat) void {
     if (seat.mode) |ptr| {
         c.free(ptr);
     }
@@ -268,12 +259,10 @@ fn teardown_seat(seat: *c.Seat) void {
     c.free(seat);
 }
 
-pub export
-fn draw_frame(
-    bar: *c.Bar,
-) c_int {
+pub
+fn draw_frame(bar: *Bar) c_int {
     // Allocate buffer to be attached to the surface
-    const fd = c.allocate_shm_file(bar.bufsize);
+    const fd = allocate_shm_file(bar.bufsize);
     if (fd == -1) {
         return -1;
     }
@@ -415,7 +404,7 @@ fn draw_frame(
             }
         }
         
-        x = c.draw_text(
+        x = draw_text(
             tags[i],
             x,
             y,
@@ -431,7 +420,7 @@ fn draw_frame(
     }
     
     if (!no_mode) {
-        var seats = wl.List(c.Seat)
+        var seats = wl.List(Seat)
             .from(&seat_list)
             .iterator("link");
         
@@ -443,7 +432,7 @@ fn draw_frame(
                     c.strcmp(seat.mode, "normal") != 0
                 )
             ) or !hide_normal_mode) {
-                x = c.draw_text(
+                x = draw_text(
                     seat.mode,
                     x,
                     y,
@@ -462,7 +451,7 @@ fn draw_frame(
     
     if (!no_layout) {
         if ((bar.mtags & bar.ctags) != 0) {
-            x = c.draw_text(
+            x = draw_text(
                 bar.layout,
                 x,
                 y,
@@ -624,7 +613,7 @@ fn parse_color(
 
 // Shared memory support function adapted from
 // [wayland-book]
-pub export
+pub
 fn allocate_shm_file(size: c_long) c_int {
     const fd = c.memfd_create("surface", c.MFD_CLOEXEC);
     if (fd == -1) {
@@ -650,55 +639,56 @@ fn allocate_shm_file(size: c_long) c_int {
     return fd;
 }
 
-pub export
+pub
 var river_control: ?*c.struct_zriver_control_v1 = null;
 
 pub
 var tags: [][*c]u8 = undefined;
 
-pub export
+pub
 var hidden = false;
 
-pub export
+pub
 var bottom = false;
 
-pub export
+pub
 var hide_vacant = false;
 
-pub export
+pub
 var no_title = false;
 
-pub export
+pub
 var no_status_commands = false;
 
-pub export
+pub
 var no_mode = false;
 
-pub export
+pub
 var no_layout = false;
 
-pub export
+pub
 var hide_normal_mode = false;
 
-pub export
+pub
 var compositor: ?*c.struct_wl_compositor = null;
 
-pub export
+pub
 var shm: ?*c.struct_wl_shm = null;
 
-pub export
+pub
 var bar_list: c.wl_list = undefined;
 
-pub export
+pub
 var seat_list: c.wl_list = undefined;
 
-pub inline fn text_width(
+pub inline
+fn text_width(
     text: [*c]u8,
     maxwidth: u32,
     padding: u32,
     commands: bool,
 ) u32 {
-    return c.draw_text(
+    return draw_text(
         text,
         0,
         0,
@@ -713,10 +703,10 @@ pub inline fn text_width(
     );
 }
 
-pub export
+pub
 var font: ?*c.fcft_font = null;
 
-pub export
+pub
 fn draw_text(
     raw_text: [*c]const u8,
     raw_x: u32,
@@ -967,10 +957,10 @@ fn draw_text(
 }
 
 
-pub export
+pub
 var run_display = false;
 
-fn set_status(bar: *c.Bar, data: ?[]const u8) void {
+fn set_status(bar: *Bar, data: ?[]const u8) void {
     if (bar.status) |ptr| {
         c.free(ptr);
     }
@@ -982,22 +972,19 @@ fn set_status(bar: *c.Bar, data: ?[]const u8) void {
     bar.redraw = true;
 }
 
-fn set_visible(bar: *c.Bar, _: ?[]const u8) void {
+fn set_visible(bar: *Bar, _: ?[]const u8) void {
     if (bar.hidden) {
         show_bar(bar);
     }
 }
 
-fn set_invisible(bar: *c.Bar, _: ?[]const u8) void {
+fn set_invisible(bar: *Bar, _: ?[]const u8) void {
     if (!bar.hidden) {
         hide_bar(bar);
     }
 }
 
-fn toggle_visibility(
-    bar: *c.Bar,
-    _: ?[]const u8,
-) void {
+fn toggle_visibility(bar: *Bar, _: ?[]const u8) void {
     if (bar.hidden) {
         show_bar(bar);
     } else {
@@ -1005,7 +992,7 @@ fn toggle_visibility(
     }
 }
 
-fn set_top(bar: *c.Bar, _: ?[]const u8) void {
+fn set_top(bar: *Bar, _: ?[]const u8) void {
     if (!bar.hidden) {
         c.zwlr_layer_surface_v1_set_anchor(
             bar.layer_surface,
@@ -1019,7 +1006,7 @@ fn set_top(bar: *c.Bar, _: ?[]const u8) void {
     bar.bottom = false;
 }
 
-fn set_bottom(bar: *c.Bar, _: ?[]const u8) void {
+fn set_bottom(bar: *Bar, _: ?[]const u8) void {
     if (!bar.hidden) {
         c.zwlr_layer_surface_v1_set_anchor(
             bar.layer_surface,
@@ -1033,7 +1020,7 @@ fn set_bottom(bar: *c.Bar, _: ?[]const u8) void {
     bar.bottom = true;
 }
 
-fn toggle_location(bar: *c.Bar, _: ?[]const u8) void {
+fn toggle_location(bar: *Bar, _: ?[]const u8) void {
     if (bar.bottom) {
         set_top(bar, null);
     } else {
@@ -1045,7 +1032,7 @@ inline
 fn find_function(
     command: []const u8
 ) ?*const fn(
-    bar: *c.Bar,
+    bar: *Bar,
     data: ?[]const u8,
 ) void {
     const commands = .{
@@ -1068,7 +1055,7 @@ fn find_function(
     return null;
 }
 
-pub export
+pub
 fn read_stdin() c_int {
     const in = std.io.getStdIn().reader();
     var buffer: [8192]u8 = undefined;
@@ -1089,7 +1076,7 @@ fn read_stdin() c_int {
         @panic("no command param in input");
     const data = words.rest();
     
-    var bars = wl.List(c.Bar)
+    var bars = wl.List(Bar)
         .from(&bar_list)
         .iterator("link");
     
@@ -1125,7 +1112,7 @@ fn read_stdin() c_int {
     return 1;
 }
 
-pub export
+pub
 fn event_loop() void {
     var fds = [_]c.struct_pollfd{
         .{
@@ -1161,7 +1148,7 @@ fn event_loop() void {
             }
         }
         
-        var bars = wl.List(c.Bar)
+        var bars = wl.List(Bar)
             .from(&bar_list)
             .iterator("link");
         while (bars.next()) |bar| {
@@ -1175,8 +1162,8 @@ fn event_loop() void {
     }
 }
 
-pub export
-fn sig_handler(signal: c_int) void {
+pub
+fn sig_handler(signal: c_int) callconv(.c) void {
     if (
         signal == c.SIGINT or
         signal == c.SIGHUP or

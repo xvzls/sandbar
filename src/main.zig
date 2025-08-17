@@ -14,9 +14,6 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
     
-    // Bar *bar, *bar2;
-    // Seat *seat, *seat2;
-    
     const params = comptime clap.parseParamsComptime(
         \\--hidden                   bars will initially be hidden
         \\--bottom                   bars will initially be drawn at the bottom
@@ -217,7 +214,7 @@ pub fn main() !void {
     }
     
     {
-        var bars = wl.List(c.Bar)
+        var bars = wl.List(lib.Bar)
             .from(&lib.bar_list)
             .iterator("link");
         while (bars.next()) |bar| {
@@ -226,7 +223,7 @@ pub fn main() !void {
     }
     
     {
-        var seats = wl.List(c.Seat)
+        var seats = wl.List(lib.Seat)
             .from(&lib.seat_list)
             .iterator("link");
         while (seats.next()) |seat| {
@@ -258,7 +255,7 @@ pub fn main() !void {
     allocator.free(lib.tags);
     
     {
-        var bars = wl.List(c.Bar)
+        var bars = wl.List(lib.Bar)
             .from(&lib.bar_list)
             .iterator("link");
         while (bars.next()) |bar| {
@@ -267,7 +264,7 @@ pub fn main() !void {
     }
     
     {
-        var seats = wl.List(c.Seat)
+        var seats = wl.List(lib.Seat)
             .from(&lib.seat_list)
             .iterator("link");
         while (seats.next()) |seat| {

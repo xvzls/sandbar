@@ -265,7 +265,6 @@ pub fn build(b: *std.Build) void {
             generate_wlr_layer_shell_protocol.source,
             generate_river_status_protocol.source,
             generate_river_control_protocol.source,
-            "sandbar.c",
         },
     });
     b.installArtifact(lib);

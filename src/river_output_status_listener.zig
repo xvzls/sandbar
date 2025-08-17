@@ -1,15 +1,14 @@
 const std = @import("std");
-const wl = @import("wl.zig");
-const c = @cImport({
-    @cInclude("sandbar.h");
-});
+const lib = @import("root.zig");
+const wl = lib.wl;
+const c = lib.c;
 
 fn focused_tags(
     data: ?*anyopaque,
     _: ?*c.struct_zriver_output_status_v1,
     n_tags: u32,
 ) callconv(.c) void {
-    const bar: *c.Bar = @ptrCast(@alignCast(data.?));
+    const bar: *lib.Bar = @ptrCast(@alignCast(data.?));
     
     bar.mtags = n_tags;
     bar.redraw = true;
@@ -20,7 +19,7 @@ fn urgent_tags(
     _: ?*c.struct_zriver_output_status_v1,
     n_tags: u32,
 ) callconv(.c) void {
-    const bar: *c.Bar = @ptrCast(@alignCast(data.?));
+    const bar: *lib.Bar = @ptrCast(@alignCast(data.?));
     
     bar.urg = n_tags;
     bar.redraw = true;
@@ -31,7 +30,7 @@ fn view_tags(
     _: ?*c.struct_zriver_output_status_v1,
     wl_array: ?*c.struct_wl_array,
 ) callconv(.c) void {
-    const bar: *c.Bar = @ptrCast(@alignCast(data.?));
+    const bar: *lib.Bar = @ptrCast(@alignCast(data.?));
     
     bar.ctags = 0;
     
@@ -49,7 +48,7 @@ fn layout_name(
     _: ?*c.struct_zriver_output_status_v1,
     name: [*c]const u8,
 ) callconv(.c) void {
-    const bar: *c.Bar = @ptrCast(@alignCast(data.?));
+    const bar: *lib.Bar = @ptrCast(@alignCast(data.?));
     
     if (bar.layout) |ptr| {
         c.free(ptr);
@@ -69,7 +68,7 @@ fn layout_name_clear(
     data: ?*anyopaque,
     _: ?*c.struct_zriver_output_status_v1,
 ) callconv(.c) void {
-    const bar: *c.Bar = @ptrCast(@alignCast(data.?));
+    const bar: *lib.Bar = @ptrCast(@alignCast(data.?));
     
     if (bar.layout) |layout| {
         c.free(layout);

@@ -1,9 +1,7 @@
 const lib = @import("root.zig");
 const std = @import("std");
-const wl = @import("wl.zig");
-const c = @cImport({
-    @cInclude("sandbar.h");
-});
+const wl = lib.wl;
+const c = lib.c;
 
 var cursor_image: ?*c.struct_wl_cursor_image = null;
 var cursor_surface: ?*c.struct_wl_surface = null;
@@ -16,7 +14,7 @@ fn enter(
     _: c.wl_fixed_t,
     _: c.wl_fixed_t,
 ) callconv(.c) void {
-    const seat: *c.Seat = @ptrCast(@alignCast(data.?));
+    const seat: *lib.Seat = @ptrCast(@alignCast(data.?));
     
     seat.hovering = true;
     
@@ -35,7 +33,7 @@ fn enter(
         );
         c.wl_surface_set_buffer_scale(
             cursor_surface,
-            @intCast(c.buffer_scale),
+            @intCast(lib.buffer_scale),
         );
         c.wl_surface_attach(
             cursor_surface,
@@ -61,7 +59,7 @@ fn leave(
     _: u32,
     _: ?*c.struct_wl_surface,
 ) callconv(.c) void {
-    const seat: *c.Seat = @ptrCast(@alignCast(data.?));
+    const seat: *lib.Seat = @ptrCast(@alignCast(data.?));
     
     seat.hovering = false;
 }
@@ -74,7 +72,7 @@ fn button(
     code: u32,
     state: u32,
 ) callconv(.c) void {
-    const seat: *c.Seat = @ptrCast(@alignCast(data.?));
+    const seat: *lib.Seat = @ptrCast(@alignCast(data.?));
     
     seat.pointer_button = if (
         state == c.WL_POINTER_BUTTON_STATE_PRESSED
@@ -88,7 +86,7 @@ fn motion(
     surface_x: c.wl_fixed_t,
     surface_y: c.wl_fixed_t,
 ) callconv(.c) void {
-    const seat: *c.Seat = @alignCast(@ptrCast(data.?));
+    const seat: *lib.Seat = @alignCast(@ptrCast(data.?));
     
     seat.pointer_x = @intCast(
         c.wl_fixed_to_int(surface_x)
@@ -102,8 +100,8 @@ fn frame(
     data: ?*anyopaque,
     _: ?*c.struct_wl_pointer,
 ) callconv(.c) void {
-    const seat: *c.Seat = @alignCast(@ptrCast(data.?));
-    const bar: *c.Bar = seat.bar orelse return;
+    const seat: *lib.Seat = @alignCast(@ptrCast(data.?));
+    const bar: *lib.Bar = seat.bar orelse return;
     
     if (seat.pointer_button == 0 or !seat.hovering) {
         return;
@@ -116,7 +114,7 @@ fn frame(
     var x: u32 = 0;
     const one: u32 = 1;
     while (true) {
-        if (c.hide_vacant) {
+        if (lib.hide_vacant) {
             const active = (bar.mtags & one << i) != 0;
             const occupied = (bar.ctags & one << i) != 0;
             const urgent = (bar.urg & one << i) != 0;
@@ -154,7 +152,7 @@ fn frame(
         };
         
         c.zriver_control_v1_add_argument(
-            c.river_control,
+            lib.river_control,
             cmd,
         );
         
@@ -166,18 +164,18 @@ fn frame(
             @panic(@errorName(err));
         };
         c.zriver_control_v1_add_argument(
-            c.river_control,
+            lib.river_control,
             argument,
         );
         _ = c.zriver_control_v1_run_command(
-            c.river_control,
+            lib.river_control,
             seat.wl_seat,
         );
         
         return;
     }
     
-    var seats = wl.List(c.Seat)
+    var seats = wl.List(lib.Seat)
         .from(&lib.seat_list)
         .iterator("link");
     

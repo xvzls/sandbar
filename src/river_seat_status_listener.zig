@@ -1,26 +1,24 @@
 const lib = @import("root.zig");
 const std = @import("std");
-const wl = @import("wl.zig");
-const c = @cImport({
-    @cInclude("sandbar.h");
-});
+const wl = lib.wl;
+const c = lib.c;
 
 fn focused_output(
     data: ?*anyopaque,
     _: ?*c.struct_zriver_seat_status_v1,
     wl_output: ?*c.struct_wl_output,
 ) callconv(.c) void {
-    const seat: *c.Seat = @ptrCast(@alignCast(data.?));
+    const seat: *lib.Seat = @ptrCast(@alignCast(data.?));
     
-    var bars = wl.List(c.Bar)
+    var bars = wl.List(lib.Bar)
         .from(&lib.bar_list)
         .iterator("link");
     
     while (bars.next()) |bar| {
         if (bar.wl_output == wl_output) {
             seat.bar = bar;
-            seat.bar.*.sel = true;
-            seat.bar.*.redraw = true;
+            seat.bar.?.sel = true;
+            seat.bar.?.redraw = true;
             return;
         }
     }
@@ -33,8 +31,8 @@ fn unfocused_output(
     _: ?*c.struct_zriver_seat_status_v1,
     _: ?*c.struct_wl_output,
 ) callconv(.c) void {
-    const seat: *c.Seat = @ptrCast(@alignCast(data.?));
-    const bar: *c.Bar = seat.bar orelse return;
+    const seat: *lib.Seat = @ptrCast(@alignCast(data.?));
+    const bar: *lib.Bar = seat.bar orelse return;
     
     bar.sel = false;
     bar.redraw = true;
@@ -50,8 +48,8 @@ fn focused_view(
         return;
     }
     
-    const seat: *c.Seat = @ptrCast(@alignCast(data.?));
-    const bar: *c.Bar = seat.bar orelse return;
+    const seat: *lib.Seat = @ptrCast(@alignCast(data.?));
+    const bar: *lib.Bar = seat.bar orelse return;
     
     if (bar.title) |ptr| {
         c.free(ptr);
@@ -72,7 +70,7 @@ fn mode(
     _: ?*c.struct_zriver_seat_status_v1,
     name: [*c]const u8,
 ) callconv(.c) void {
-    const seat: *c.Seat = @ptrCast(@alignCast(data.?));
+    const seat: *lib.Seat = @ptrCast(@alignCast(data.?));
     
     if (seat.mode) |ptr| {
         c.free(ptr);
@@ -85,7 +83,7 @@ fn mode(
         @panic(@errorName(err));
     };
     
-    var bars = wl.List(c.Bar)
+    var bars = wl.List(lib.Bar)
         .from(&lib.bar_list)
         .iterator("link");
     

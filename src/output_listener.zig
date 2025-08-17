@@ -1,7 +1,6 @@
 const std = @import("std");
-const c = @cImport({
-    @cInclude("sandbar.h");
-});
+const lib = @import("root.zig");
+const c = lib.c;
 
 fn description(
     _: ?*anyopaque,
@@ -45,7 +44,7 @@ fn name(
     _: ?*c.struct_wl_output,
     output_name: [*c]const u8,
 ) callconv(.c) void {
-    const bar: *c.Bar = @alignCast(@ptrCast(data.?));
+    const bar: *lib.Bar = @alignCast(@ptrCast(data.?));
     
     if (bar.output_name) |ptr| {
         c.free(ptr);

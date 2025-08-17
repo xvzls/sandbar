@@ -1,8 +1,6 @@
 const lib = @import("root.zig");
 const std = @import("std");
-const c = @cImport({
-    @cInclude("sandbar.h");
-});
+const c = lib.c;
 
 // Layer-surface setup adapted from layer-shell example
 // in [wlroots]
@@ -18,7 +16,7 @@ fn configure(
         serial,
     );
     
-    var bar: *c.Bar = @ptrCast(@alignCast(data));
+    var bar: *lib.Bar = @ptrCast(@alignCast(data));
     
     const w = raw_w * lib.buffer_scale;
     const h = raw_h * lib.buffer_scale;

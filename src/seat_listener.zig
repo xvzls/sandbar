@@ -1,15 +1,13 @@
 const lib = @import("root.zig");
 const std = @import("std");
-const c = @cImport({
-    @cInclude("sandbar.h");
-});
+const c = lib.c;
 
 fn capabilities(
     data: ?*anyopaque,
     _: ?*c.struct_wl_seat,
     code: u32,
 ) callconv(.c) void {
-    const seat: *c.Seat = @ptrCast(@alignCast(data.?));
+    const seat: *lib.Seat = @ptrCast(@alignCast(data.?));
     
     const has_pointer = (
         code & c.WL_SEAT_CAPABILITY_POINTER
