@@ -136,7 +136,7 @@ fn frame(
         if (seat.pointer_x >= x){
             i += 1;
             
-            if (i < lib.tags_l) {
+            if (i < lib.tags.len) {
                 continue;
             }
         }
@@ -144,7 +144,7 @@ fn frame(
         break;
     }
     
-    if (i < lib.tags_l) {
+    if (i < lib.tags.len) {
         // Clicked on tags
         const cmd = switch (pointer_button) {
             c.BTN_LEFT => "set-focused-tags",

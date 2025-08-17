@@ -9,14 +9,14 @@ COLOR_ROSE_600='#ec003f'
 COLOR_WHITE='#ffffff'
 
 super-status run sandbar | ./zig-out/bin/sandbar \
-	-font 'Monofur Nerd Font Propo:size=10' \
-	-active-fg-color "$COLOR_TEAL_400" \
-	-active-bg-color "$COLOR_TEAL_950" \
-	-inactive-fg-color "$COLOR_WHITE" \
-	-inactive-bg-color "$COLOR_TEAL_1000" \
-	-urgent-fg-color "$COLOR_WHITE" \
-	-urgent-bg-color "$COLOR_ROSE_600" \
-	-title-fg-color "$COLOR_WHITE" \
-	-title-bg-color "$COLOR_TEAL_950" \
-	-vertical-padding 4
+	--font 'Monofur Nerd Font Propo:size=10' \
+	--active-fg-color "$COLOR_TEAL_400" \
+	--active-bg-color "$COLOR_TEAL_950" \
+	--inactive-fg-color "$COLOR_WHITE" \
+	--inactive-bg-color "$COLOR_TEAL_1000" \
+	--urgent-fg-color "$COLOR_WHITE" \
+	--urgent-bg-color "$COLOR_ROSE_600" \
+	--title-fg-color "$COLOR_WHITE" \
+	--title-bg-color "$COLOR_TEAL_950" \
+	--vertical-padding 4
 

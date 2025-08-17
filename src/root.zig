@@ -1,5 +1,5 @@
 const std = @import("std");
-const wl = @import("wl.zig");
+pub const wl = @import("wl.zig");
 pub const c = @cImport({
     @cInclude("sandbar.h");
 });
@@ -354,7 +354,7 @@ fn draw_frame(
         @divFloor(font.?.height, 6) + 2
     );
     
-    for (0 .. tags_l) |i| {
+    for (0 .. tags.len) |i| {
         const one: u32 = 1;
         const ii: u5 = @intCast(i);
         
@@ -589,31 +589,20 @@ fn draw_frame(
     return 0;
 }
 
-pub export
+pub
 fn parse_color(
-    raw_string: [*c]const u8,
-    color: *c.pixman_color_t,
-) c_int {
-    const string = std.mem.trimLeft(
-        u8,
-        std.mem.span(raw_string),
-        "#",
-    );
+    string: []const u8
+) !c.pixman_color_t {
+    const hex = std.mem.trimLeft(u8, string, "#");
     
-    if (
-        (string.len != 6 and string.len != 8) or
-        c.isxdigit(string[0]) == 0 or
-        c.isxdigit(string[1]) == 0
-    ) {
-        return -1;
+    if (hex.len != 6 and hex.len != 8) {
+        return error.InvalidHexSize;
     }
     
-    var parsed =
-        std.fmt.parseInt(u32, string, 16)
-    catch
-        return -1;
+    var parsed = try std.fmt.parseInt(u32, hex, 16);
+    var color: c.pixman_color_t = undefined;
     
-    if (string.len == 8) {
+    if (hex.len == 8) {
         color.alpha = @intCast((parsed & 0xff) * 0x101);
         parsed >>= 8;
     } else {
@@ -630,7 +619,7 @@ fn parse_color(
         ((parsed >>  0) & 0xff) * 0x101
     );
     
-    return 0;
+    return color;
 }
 
 // Shared memory support function adapted from
@@ -664,11 +653,8 @@ fn allocate_shm_file(size: c_long) c_int {
 pub export
 var river_control: ?*c.struct_zriver_control_v1 = null;
 
-pub export
-var tags: [*c][*c]u8 = undefined;
-
-pub export
-var tags_l: u32 = 0;
+pub
+var tags: [][*c]u8 = undefined;
 
 pub export
 var hidden = false;
@@ -804,10 +790,9 @@ fn draw_text(
                         if (arg.* == 0) {
                             cur_bg_color = bg_color.?.*;
                         } else {
-                            _ = parse_color(
-                                arg,
-                                &cur_bg_color,
-                            );
+                            cur_bg_color = parse_color(
+                                std.mem.span(arg)
+                            ) catch |err| @panic(@errorName(err));
                         }
                     }
                 } else if (c.strcmp(p, "fg") == 0) {
@@ -817,9 +802,10 @@ fn draw_text(
                         if (arg.* == 0) {
                             color = fg_color.?.*;
                         } else if (parse_color(
-                            arg,
-                            &color,
-                        ) == -1) {
+                            std.mem.span(arg)
+                        )) |value| {
+                            color = value;
+                        } else |_| {
                             refresh = false;
                         }
                         

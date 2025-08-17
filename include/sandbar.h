@@ -117,12 +117,6 @@ extern
 struct zriver_control_v1 *river_control;
 
 extern
-char **tags;
-
-extern
-uint32_t tags_l;
-
-extern
 bool hidden;
 
 extern
@@ -191,9 +185,6 @@ struct wl_display *display;
 
 extern
 struct zriver_status_manager_v1 *river_status_manager;
-
-extern
-char *fontstr;
 
 extern
 void show_bar(Bar *bar);

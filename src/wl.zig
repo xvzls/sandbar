@@ -17,6 +17,7 @@ pub fn List(comptime T: type) type {
             return extern struct {
                 start: *c.wl_list,
                 current: *c.wl_list,
+                preceding: *c.wl_list,
                 
                 pub inline fn from(
                     list: *c.wl_list
@@ -24,14 +25,17 @@ pub fn List(comptime T: type) type {
                     return @This(){
                         .start = list,
                         .current = list,
+                        .preceding = list.next,
                     };
                 }
                 
-                pub fn next(this: *@This()) ?*T {
-                    this.current = this.current.next;
-                    if (this.current == this.start) {
+                pub inline fn next(this: *@This()) ?*T {
+                    if (this.preceding == this.start) {
                         return null;
                     }
+                    
+                    this.current = this.preceding;
+                    this.preceding = this.current.next;
                     
                     return @fieldParentPtr(
                         link,

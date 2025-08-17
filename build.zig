@@ -221,6 +221,10 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     exe_mod.addImport("sandbar_lib", lib_mod);
+    exe_mod.addImport("clap", b.dependency("clap", .{
+        .target = target,
+        .optimize = optimize,
+    }).module("clap"));
     
     const lib = b.addLibrary(.{
         .linkage = .static,
