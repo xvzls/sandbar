@@ -1,6 +1,5 @@
-const c = @cImport({
-    @cInclude("sandbar.h");
-});
+const lib = @import("root.zig");
+const c = lib.c;
 
 fn release(
     _: ?*anyopaque,

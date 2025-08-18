@@ -1,7 +1,31 @@
 const std = @import("std");
 pub const wl = @import("wl.zig");
 pub const c = @cImport({
-    @cInclude("sandbar.h");
+    @cDefine("_GNU_SOURCE", {});
+    @cInclude("ctype.h");
+    @cInclude("errno.h");
+    @cInclude("fcft/fcft.h");
+    @cInclude("fcntl.h");
+    @cInclude("linux/input-event-codes.h");
+    @cInclude("pixman.h");
+    @cInclude("signal.h");
+    @cInclude("stdbool.h");
+    @cInclude("stdio.h");
+    @cInclude("stdlib.h");
+    @cInclude("string.h");
+    @cInclude("poll.h");
+    @cInclude("sys/mman.h");
+    @cInclude("sys/select.h");
+    @cInclude("wayland-client.h");
+    @cInclude("wayland-cursor.h");
+    @cInclude("wayland-util.h");
+    
+    @cInclude("unistd.h");
+    
+    @cInclude("xdg-shell-protocol.h");
+    @cInclude("wlr-layer-shell-unstable-v1-protocol.h");
+    @cInclude("river-status-unstable-v1-protocol.h");
+    @cInclude("river-control-unstable-v1-protocol.h");
 });
 
 pub const Bar = @import("Bar.zig");
@@ -706,6 +730,46 @@ fn text_width(
 pub
 var font: ?*c.fcft_font = null;
 
+const Utf8 = enum(u32) {
+    accept = 0,
+    reject = 1,
+};
+
+const UTF8_D = [_]u8{
+	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 00..1f
+	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 20..3f
+	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 40..5f
+	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 60..7f
+	1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9, // 80..9f
+	7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7, // a0..bf
+	8,8,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2, // c0..df
+	0xa,0x3,0x3,0x3,0x3,0x3,0x3,0x3,0x3,0x3,0x3,0x3,0x3,0x4,0x3,0x3, // e0..ef
+	0xb,0x6,0x6,0x6,0x5,0x8,0x8,0x8,0x8,0x8,0x8,0x8,0x8,0x8,0x8,0x8, // f0..ff
+	0x0,0x1,0x2,0x3,0x5,0x8,0x7,0x1,0x1,0x1,0x4,0x6,0x1,0x1,0x1,0x1, // s0..s0
+	1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,1,1,1,1,0,1,0,1,1,1,1,1,1, // s1..s2
+	1,2,1,1,1,1,1,2,1,2,1,1,1,1,1,1,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1, // s3..s4
+	1,2,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1,1,1,1,1,1,3,1,3,1,1,1,1,1,1, // s5..s6
+	1,3,1,1,1,1,1,3,1,3,1,1,1,1,1,1,1,3,1,1,1,1,1,1,1,1,1,1,1,1,1,1, // s7..s8
+};
+
+inline
+fn utf8_decode(
+    state: *u32,
+    codep: *u32,
+    byte: u8,
+) u32 {
+	const kind: u32 = @intCast(UTF8_D[byte]);
+    
+	codep.* = if (state.* != @intFromEnum(Utf8.accept))
+		(byte & 0x3f) | (codep.* << 6)
+	else
+		(@as(u32, 0xff) >> @as(u5, @intCast(kind))) & (byte);
+    
+	state.* = @intCast(UTF8_D[256 + state.* * 16 + kind]);
+    
+	return state.*;
+}
+
 pub
 fn draw_text(
     raw_text: [*c]const u8,
@@ -751,7 +815,7 @@ fn draw_text(
         std.mem.zeroes(c.pixman_color_t);
     
     var codepoint: u32 = 0;
-    var state: u32 = c.UTF8_ACCEPT;
+    var state: u32 = @intFromEnum(Utf8.accept);
     var last_cp: u32 = 0;
     
     var p = raw_text;
@@ -760,39 +824,41 @@ fn draw_text(
         if (
             !no_status_commands and
             commands and
-            state == c.UTF8_ACCEPT and
+            state == @intFromEnum(Utf8.accept) and
             p.* == '^'
         ) {
             p += 1;
             if (p.* != '^') {
                 // Parse color
-                var arg = c.strchr(p, '(');
-                const end = c.strchr(arg + 1, ')');
-                if (arg == null or end == null) {
+                const start =
+                    std.mem.indexOfScalar(u8, std.mem.span(p), '(')
+                orelse
                     continue;
-                }
-                arg.* = 0;
-                end.* = 0;
-                arg += 1;
+                const end =
+                    std.mem.indexOfScalarPos(u8, std.mem.span(p), start, ')')
+                orelse
+                    continue;
+                const ground = p[0 .. start];
+                const hex = p[start + 1 .. end];
                 
-                if (c.strcmp(p, "bg") == 0) {
+                if (std.mem.eql(u8, ground, "bg")) {
                     if (draw_bg) {
-                        if (arg.* == 0) {
-                            cur_bg_color = bg_color.?.*;
-                        } else {
-                            cur_bg_color = parse_color(
-                                std.mem.span(arg)
-                            ) catch |err| @panic(@errorName(err));
-                        }
+                        cur_bg_color = if (hex.len == 0)
+                            bg_color.?.*
+                        else
+                            parse_color(hex)
+                        catch |err|
+                            @panic(@errorName(err));
                     }
-                } else if (c.strcmp(p, "fg") == 0) {
+                } else if (std.mem.eql(u8, ground, "fg")) {
                     if (draw_fg) {
                         var color: c.pixman_color_t = undefined;
                         var refresh = true;
-                        if (arg.* == 0) {
+                        
+                        if (hex.len == 0) {
                             color = fg_color.?.*;
                         } else if (parse_color(
-                            std.mem.span(arg)
+                            hex
                         )) |value| {
                             color = value;
                         } else |_| {
@@ -808,17 +874,13 @@ fn draw_text(
                     }
                 }
                 
-                // Restore string for later redraws
-                arg -= 1;
-                arg.* = '(';
-                end.* = ')';
-                p = end;
+                p += end;
                 continue;
             }
         }
         
         // Returns nonzero if more bytes are needed
-        if (c.utf8decode(&state, &codepoint, p.*) != 0) {
+        if (utf8_decode(&state, &codepoint, p.*) != 0) {
             continue;
         }
         // Turn off subpixel rendering, which

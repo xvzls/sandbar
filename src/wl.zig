@@ -1,7 +1,6 @@
+const lib = @import("root.zig");
 const std = @import("std");
-const c = @cImport({
-    @cInclude("sandbar.h");
-});
+const c = lib.c;
 
 pub fn List(comptime T: type) type {
     return extern struct {
